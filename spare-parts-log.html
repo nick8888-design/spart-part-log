@@ -221,7 +221,33 @@
   .upload-zone .icon { font-size: 28px; margin-bottom: 6px; }
   .upload-zone .text { font-weight: 500; }
   .upload-zone .hint { font-size: 11px; color: var(--text-3); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+  
+  /* Two-button upload (Camera + Gallery) */
+  .upload-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .upload-btn {
+    display: block;
+    text-align: center;
+    padding: 22px 12px;
+    background: var(--bg);
+    border: 2px dashed var(--line);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .upload-btn:hover, .upload-btn:active {
+    border-color: var(--accent);
+    background: rgba(78, 205, 196, 0.08);
+  }
+  .upload-btn .icon { font-size: 32px; margin-bottom: 6px; }
+  .upload-btn .text { font-weight: 600; font-size: 15px; letter-spacing: 0.05em; }
+  .upload-btn .hint { font-size: 10px; color: var(--text-3); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+  
   #fileInput, #importFile { display: none; }
+  #cameraInput, #galleryInput { display: none; }
 
   /* Item rows */
   .item-row {
@@ -567,12 +593,20 @@
   <section id="tab-add" class="tab-content">
     <div class="card">
       <div class="card-title">📷 扫描表单（可选）</div>
-      <label for="fileInput" class="upload-zone" id="uploadZone">
-        <div class="icon">📄</div>
-        <div class="text">点击拍照或选择图片</div>
-        <div class="hint">系统会自动填入下方表单 · 你可修改</div>
-      </label>
-      <input type="file" id="fileInput" accept="image/*" capture="environment">
+      <div class="upload-buttons">
+        <label for="cameraInput" class="upload-btn">
+          <div class="icon">📸</div>
+          <div class="text">拍 照</div>
+          <div class="hint">现场拍新表</div>
+        </label>
+        <label for="galleryInput" class="upload-btn">
+          <div class="icon">🖼️</div>
+          <div class="text">相 册</div>
+          <div class="hint">从手机选已有照片</div>
+        </label>
+      </div>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment">
+      <input type="file" id="galleryInput" accept="image/*">
       <div id="ocrStatus"></div>
       <img id="previewImg" class="preview-img hidden" />
     </div>
@@ -937,16 +971,54 @@ async function parseFormText(text) {
   const custMatch = text.match(/CUSTOMER\s*NAME[\s:]*([^\n\r]+)/i);
   if (custMatch) {
     let c = custMatch[1].trim().split(/\s{2,}/)[0].slice(0, 40);
-    if (c.length > 1 && c.length < 40) result.customer = c;
+    // 排除明显是表头/无效内容的情况
+    if (c.length > 1 && c.length < 40 && 
+        !/RECEIVED|RETURN|PART|TECH|SIGN|REMARK|QTY|MODEL|EDP|CODE|DESCRIPTION/i.test(c)) {
+      result.customer = c.replace(/[|*#=_]/g, '').trim();
+    }
   }
   
-  // Technician: "REQUESTOR NAME: XXX" 或 "TECHNICIAN NAME: XXX" 或 表底 "NAME: XXX"
-  const techMatch = text.match(/(?:REQUESTOR|TECHNICIAN|TECH)\s*NAME[\s:]*([^\n\r]+)/i);
-  if (techMatch) {
+  // Technician: 多种模式识别
+  // 模式 1: "REQUESTOR NAME: SAIFU" 同一行
+  let techMatch = text.match(/(?:REQUESTOR|TECHNICIAN|TECH)\s*NAME[\s:]*([A-Za-z][A-Za-z\s'.\-]{0,28})(?:\s*REF|\s*DATE|\s*$|\n)/i);
+  if (techMatch && techMatch[1]) {
     let t = techMatch[1].trim().split(/\s{2,}/)[0].slice(0, 30);
-    // 去掉可能跟在后面的 REF NO 等字样
     t = t.replace(/REF\s*NO.*$/i, '').replace(/DATE.*$/i, '').trim();
-    if (t.length > 0 && t.length < 30) result.tech = t;
+    if (t.length > 1) result.tech = t;
+  }
+  
+  // 模式 2: 跨行模式 - "REQUESTOR NAME:" 在一行,名字在下一行
+  if (!result.tech) {
+    for (let i = 0; i < lines.length; i++) {
+      if (/(?:REQUESTOR|TECHNICIAN|TECH)\s*NAME[\s:]*$/i.test(lines[i]) && lines[i+1]) {
+        const next = lines[i+1].trim();
+        if (next.length > 1 && next.length < 30 && /^[A-Za-z]/.test(next) && !/REF|DATE|CUSTOMER/i.test(next)) {
+          result.tech = next.replace(/[:_].*$/, '').trim();
+          break;
+        }
+      }
+    }
+  }
+  
+  // 模式 3: "NAME: SAIFU" 单独一行(表底常见)
+  if (!result.tech) {
+    for (const line of lines) {
+      const m = line.match(/^NAME[\s:]+([A-Za-z][A-Za-z\s'.\-]{1,28})$/i);
+      if (m) {
+        const cand = m[1].trim();
+        // 排除 customer name 等
+        if (!/customer|date|ref/i.test(cand)) {
+          result.tech = cand;
+          break;
+        }
+      }
+    }
+  }
+  
+  // 清理识别到的名字: 去掉常见垃圾字符
+  if (result.tech) {
+    result.tech = result.tech.replace(/[|*#=_\\\/]/g, '').trim();
+    if (result.tech.length < 2) result.tech = '';
   }
   
   // Items: look for known part keywords
@@ -954,7 +1026,9 @@ async function parseFormText(text) {
     'drum', 'toner', 'roller', 'belt', 'fuser', 'cleaning', 'blade', 
     'developer', 'transfer', 'pickup', 'pick up', 'pick-up', 'charger',
     'adf', 'feed', 'separation', 'magnet', 'screw', 'gear', 'bushing',
-    'lamp', 'sensor', 'cartridge', 'unit', 'kit', 'cleaner'
+    'lamp', 'sensor', 'cartridge', 'unit', 'kit', 'cleaner',
+    'film', 'filter', 'sleeve', 'guide', 'staple', 'waste', 'ink',
+    'maintenance', 'photoconductor', 'opc', 'pcu'
   ];
   
   // Heuristic: scan lines for part keywords + nearby quantity
@@ -1101,12 +1175,12 @@ setupAutocomplete(document.getElementById('inCustomer'), document.getElementById
 setupAutocomplete(document.getElementById('inModel'), document.getElementById('modelSuggestions'), 'model');
 
 // ============== ADD: OCR ==============
-const fileInput = document.getElementById('fileInput');
+const cameraInput = document.getElementById('cameraInput');
+const galleryInput = document.getElementById('galleryInput');
 const ocrStatus = document.getElementById('ocrStatus');
 const previewImg = document.getElementById('previewImg');
 
-fileInput.addEventListener('change', async (e) => {
-  const file = e.target.files[0];
+async function handleImageFile(file) {
   if (!file) return;
   
   const url = URL.createObjectURL(file);
@@ -1137,7 +1211,10 @@ fileInput.addEventListener('change', async (e) => {
     ocrStatus.className = 'ocr-status error';
     ocrStatus.innerHTML = '✗ ' + err.message;
   }
-});
+}
+
+cameraInput.addEventListener('change', (e) => handleImageFile(e.target.files[0]));
+galleryInput.addEventListener('change', (e) => handleImageFile(e.target.files[0]));
 
 // ============== ADD: Save ==============
 document.getElementById('saveBtn').addEventListener('click', async () => {
@@ -1189,7 +1266,8 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   addItemRow();
   previewImg.classList.add('hidden');
   ocrStatus.innerHTML = '';
-  fileInput.value = '';
+  cameraInput.value = '';
+  galleryInput.value = '';
   
   switchTab('logs');
 });
