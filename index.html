@@ -222,7 +222,32 @@
   .upload-zone .text { font-weight: 500; }
   .upload-zone .hint { font-size: 11px; color: var(--text-3); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
   
-  /* Company buttons - 三家公司,大按钮便于选 */
+  /* Language switcher */
+  .lang-switch {
+    display: flex;
+    background: var(--bg-2);
+    border-radius: 6px;
+    padding: 2px;
+    border: 1px solid var(--line);
+  }
+  .lang-btn {
+    background: none;
+    border: none;
+    color: var(--text-2);
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .lang-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+  }
+
+  /* Company buttons */
   .company-buttons {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -744,31 +769,39 @@
 
 <div class="container">
   <header class="header">
-    <h1>Spare Parts Log <span class="badge">TECH</span></h1>
-    <div class="sub">Service Department · Daily Requisition</div>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+      <div style="flex: 1;">
+        <h1 data-i18n="app_title">Spare Parts Log <span class="badge">TECH</span></h1>
+        <div class="sub" data-i18n="app_subtitle">Service Department · Daily Requisition</div>
+      </div>
+      <div class="lang-switch">
+        <button class="lang-btn active" data-lang="zh">中</button>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
+    </div>
   </header>
 
   <nav class="tabs">
-    <button class="tab active" data-tab="add">+ 新增</button>
-    <button class="tab" data-tab="logs">记录</button>
-    <button class="tab" data-tab="stats">统计</button>
-    <button class="tab" data-tab="settings">设置</button>
+    <button class="tab active" data-tab="add" data-i18n="tab_add">+ 新增</button>
+    <button class="tab" data-tab="logs" data-i18n="tab_logs">记录</button>
+    <button class="tab" data-tab="stats" data-i18n="tab_stats">统计</button>
+    <button class="tab" data-tab="settings" data-i18n="tab_settings">设置</button>
   </nav>
 
   <!-- ADD TAB -->
   <section id="tab-add" class="tab-content">
     <div class="card">
-      <div class="card-title">📷 扫描表单（可选）</div>
+      <div class="card-title" data-i18n="card_scan">📷 扫描表单（可选）</div>
       <div class="upload-buttons">
         <label for="cameraInput" class="upload-btn">
           <div class="icon">📸</div>
-          <div class="text">拍 照</div>
-          <div class="hint">现场拍新表</div>
+          <div class="text" data-i18n="btn_camera">拍 照</div>
+          <div class="hint" data-i18n="btn_camera_hint">现场拍新表</div>
         </label>
         <label for="galleryInput" class="upload-btn">
           <div class="icon">🖼️</div>
-          <div class="text">相 册</div>
-          <div class="hint">从手机选已有照片</div>
+          <div class="text" data-i18n="btn_gallery">相 册</div>
+          <div class="hint" data-i18n="btn_gallery_hint">从手机选已有照片</div>
         </label>
       </div>
       <input type="file" id="cameraInput" accept="image/*" capture="environment">
@@ -778,21 +811,21 @@
     </div>
 
     <div class="card">
-      <div class="card-title">📋 表单信息</div>
+      <div class="card-title" data-i18n="card_form_info">📋 表单信息</div>
       
       <div class="form-group">
-        <label class="field-label">公司 Company</label>
+        <label class="field-label" data-i18n="label_company">公司 Company</label>
         <div class="company-buttons">
           <button type="button" class="company-btn" data-company="OBC">OBC</button>
           <button type="button" class="company-btn" data-company="Plotech">Plotech</button>
           <button type="button" class="company-btn" data-company="E-Document">E-Document</button>
         </div>
-        <input type="hidden" id="inCompany" value="">
+        <input type="text" id="inCompany" placeholder="点上方按钮或手动输入" autocomplete="off" style="margin-top: 6px;">
       </div>
       
       <div class="form-row">
         <div>
-          <label class="field-label">日期</label>
+          <label class="field-label" data-i18n="label_date">日期</label>
           <input type="date" id="inDate">
         </div>
         <div>
@@ -802,7 +835,7 @@
       </div>
       
       <div class="form-group">
-        <label class="field-label">技术员 Technician</label>
+        <label class="field-label" data-i18n="label_tech">技术员 Technician</label>
         <div class="quick-techs" id="quickTechs"></div>
         <div class="input-wrap">
           <input type="text" id="inTech" placeholder="点上方按钮快速选择,或手动输入" autocomplete="off">
@@ -811,7 +844,7 @@
       </div>
       
       <div class="form-group">
-        <label class="field-label">客户名 Customer</label>
+        <label class="field-label" data-i18n="label_customer">客户名 Customer</label>
         <div class="quick-chips" id="quickCustomers"></div>
         <div class="input-wrap">
           <input type="text" id="inCustomer" placeholder="点上方常用客户,或手动输入" autocomplete="off">
@@ -820,7 +853,7 @@
       </div>
       
       <div class="form-group">
-        <label class="field-label">机器型号 Model</label>
+        <label class="field-label" data-i18n="label_model">机器型号 Model</label>
         <div class="quick-chips" id="quickModels"></div>
         <div class="input-wrap">
           <input type="text" id="inModel" placeholder="点上方常用型号,或手动输入" autocomplete="off">
@@ -831,32 +864,32 @@
 
     <div class="card">
       <div class="card-title">
-        <span>🔧 物料清单 Items</span>
+        <span data-i18n="card_items">🔧 物料清单 Items</span>
         <span id="itemsTotal" style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-2); text-transform: none; letter-spacing: normal;">共 0 件 · RM 0.00</span>
       </div>
       <div class="quick-parts-section">
-        <div class="quick-parts-label">⚡ 快捷添加（点一下加 1 件）</div>
+        <div class="quick-parts-label" data-i18n="quick_parts_label">⚡ 快捷添加（点一下加 1 件）</div>
         <div class="quick-parts" id="quickParts"></div>
       </div>
       <div id="itemsContainer"></div>
-      <button class="add-item-btn" id="addItemBtn">+ 手动添加物料</button>
+      <button class="add-item-btn" id="addItemBtn" data-i18n="btn_add_item">+ 手动添加物料</button>
     </div>
 
-    <button class="btn" id="saveBtn" style="width:100%; padding: 16px; font-size: 15px;">💾 保 存 这 张 表</button>
+    <button class="btn" id="saveBtn" style="width:100%; padding: 16px; font-size: 15px;" data-i18n="btn_save">💾 保 存 这 张 表</button>
   </section>
 
   <!-- LOGS TAB -->
   <section id="tab-logs" class="tab-content hidden">
     <div class="summary">
       <div class="tile">
-        <div class="label">本月表单</div>
+        <div class="label" data-i18n="tile_month_forms">本月表单</div>
         <div class="value accent" id="monthForms">0</div>
         <div class="meta" id="monthFormsLabel">张</div>
       </div>
       <div class="tile">
-        <div class="label">本月物料</div>
+        <div class="label" data-i18n="tile_month_items">本月物料</div>
         <div class="value orange" id="monthItems">0</div>
-        <div class="meta">件总数</div>
+        <div class="meta" data-i18n="tile_month_items_unit">件总数</div>
       </div>
     </div>
 
@@ -872,28 +905,28 @@
   <!-- STATS TAB -->
   <section id="tab-stats" class="tab-content hidden">
     <div class="card">
-      <div class="card-title">📅 统计范围</div>
+      <div class="card-title" data-i18n="stats_range">📅 统计范围</div>
       <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
-        <button class="range-btn active" data-range="thisMonth">本月</button>
-        <button class="range-btn" data-range="lastMonth">上月</button>
-        <button class="range-btn" data-range="last7">近7天</button>
-        <button class="range-btn" data-range="last30">近30天</button>
-        <button class="range-btn" data-range="custom">自定义</button>
+        <button class="range-btn active" data-range="thisMonth" data-i18n="range_thismonth">本月</button>
+        <button class="range-btn" data-range="lastMonth" data-i18n="range_lastmonth">上月</button>
+        <button class="range-btn" data-range="last7" data-i18n="range_last7">近7天</button>
+        <button class="range-btn" data-range="last30" data-i18n="range_last30">近30天</button>
+        <button class="range-btn" data-range="custom" data-i18n="range_custom">自定义</button>
       </div>
       <div id="customRange" style="display: none; gap: 8px;">
         <div style="flex: 1;">
-          <label class="field-label">从</label>
+          <label class="field-label" data-i18n="range_from">从</label>
           <input type="date" id="rangeFrom">
         </div>
         <div style="flex: 1;">
-          <label class="field-label">到</label>
+          <label class="field-label" data-i18n="range_to">到</label>
           <input type="date" id="rangeTo">
         </div>
       </div>
       <div style="margin-top: 12px;">
-        <label class="field-label">公司筛选</label>
+        <label class="field-label" data-i18n="label_company_filter">公司筛选</label>
         <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-          <button class="company-filter-btn active" data-company="all">全部</button>
+          <button class="company-filter-btn active" data-company="all" data-i18n="filter_all">全部</button>
           <button class="company-filter-btn" data-company="OBC">OBC</button>
           <button class="company-filter-btn" data-company="Plotech">Plotech</button>
           <button class="company-filter-btn" data-company="E-Document">E-Document</button>
@@ -904,33 +937,33 @@
 
     <div class="summary">
       <div class="tile">
-        <div class="label">总金额</div>
+        <div class="label" data-i18n="tile_amount">总金额</div>
         <div class="value accent" id="rangeAmount">RM 0</div>
         <div class="meta" id="rangeAmountMeta">0 张表</div>
       </div>
       <div class="tile">
-        <div class="label">物料件数</div>
+        <div class="label" data-i18n="tile_qty">物料件数</div>
         <div class="value orange" id="rangeQty">0</div>
-        <div class="meta">总件数</div>
+        <div class="meta" data-i18n="tile_qty_unit">总件数</div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">📊 分类统计</div>
+      <div class="card-title" data-i18n="stats_breakdown">📊 分类统计</div>
       
       <div class="stat-tabs">
-        <button class="stat-tab active" data-stat="parts">物料</button>
-        <button class="stat-tab" data-stat="customers">客户</button>
-        <button class="stat-tab" data-stat="models">型号</button>
-        <button class="stat-tab" data-stat="techs">技术员</button>
-        <button class="stat-tab" data-stat="companies">公司</button>
+        <button class="stat-tab active" data-stat="parts" data-i18n="stat_parts">物料</button>
+        <button class="stat-tab" data-stat="customers" data-i18n="stat_customers">客户</button>
+        <button class="stat-tab" data-stat="models" data-i18n="stat_models">型号</button>
+        <button class="stat-tab" data-stat="techs" data-i18n="stat_techs">技术员</button>
+        <button class="stat-tab" data-stat="companies" data-i18n="stat_companies">公司</button>
       </div>
 
       <div id="statsList"></div>
     </div>
 
     <div class="card">
-      <div class="card-title">每日趋势</div>
+      <div class="card-title" data-i18n="stats_trend">每日趋势</div>
       <div class="chart-container"><canvas id="trendChart"></canvas></div>
     </div>
   </section>
@@ -938,19 +971,19 @@
   <!-- SETTINGS TAB -->
   <section id="tab-settings" class="tab-content hidden">
     <div class="card">
-      <div class="card-title">🔑 OpenAI GPT-4o</div>
-      <label class="field-label">OpenAI API Key</label>
+      <div class="card-title" data-i18n="settings_api">🔑 OpenAI GPT-4o</div>
+      <label class="field-label" data-i18n="settings_api_label">OpenAI API Key</label>
       <input type="password" id="apiKeyInput" placeholder="sk-...">
       <div style="font-size: 11px; color: var(--text-3); margin-top: 8px; line-height: 1.5;">
         前往 <span style="color: var(--accent);">platform.openai.com/api-keys</span> 创建 API Key。
         每张表识别约 RM 0.04（4 仙）。GPT-4o 是当前最准的图像识别 AI。
         ⚠️ Key 只存在你浏览器本地。
       </div>
-      <button class="btn" id="saveApiKey" style="margin-top: 12px;">保存 API Key</button>
+      <button class="btn" id="saveApiKey" style="margin-top: 12px;" data-i18n="btn_save_apikey">保存 API Key</button>
     </div>
 
     <div class="card">
-      <div class="card-title">💰 物料价格表</div>
+      <div class="card-title" data-i18n="settings_prices">💰 物料价格表</div>
       <div style="font-size: 12px; color: var(--text-2); margin-bottom: 10px;">
         每家公司价格独立。在新增表单时填的价格会自动保存到对应公司的价格表。
       </div>
@@ -968,27 +1001,27 @@
     </div>
 
     <div class="card">
-      <div class="card-title">👥 技术员名单</div>
+      <div class="card-title" data-i18n="settings_techs">👥 技术员名单</div>
       <div style="font-size: 12px; color: var(--text-2); margin-bottom: 10px;">
         管理"新增"页的快捷按钮。每行一个名字,点保存生效。
       </div>
       <textarea id="techListInput" rows="5" placeholder="Saiful&#10;Syafiq&#10;Ibrahim" style="font-family: 'JetBrains Mono', monospace; resize: vertical;"></textarea>
-      <button class="btn" id="saveTechList" style="margin-top: 12px;">保存名单</button>
+      <button class="btn" id="saveTechList" style="margin-top: 12px;" data-i18n="btn_save_techs">保存名单</button>
     </div>
 
     <div class="card">
-      <div class="card-title">💾 数据</div>
+      <div class="card-title" data-i18n="settings_data">💾 数据</div>
       <div style="display: flex; flex-direction: column; gap: 8px;">
-        <button class="btn btn-ghost" id="exportCsv">📊 导出 CSV（给老板看）</button>
-        <button class="btn btn-ghost" id="exportJson">📦 导出 JSON 备份</button>
-        <button class="btn btn-ghost" id="importJsonBtn">📥 导入 JSON 备份</button>
+        <button class="btn btn-ghost" id="exportCsv" data-i18n="btn_export_csv">📊 导出 CSV（给老板看）</button>
+        <button class="btn btn-ghost" id="exportJson" data-i18n="btn_export_json">📦 导出 JSON 备份</button>
+        <button class="btn btn-ghost" id="importJsonBtn" data-i18n="btn_import_json">📥 导入 JSON 备份</button>
         <input type="file" id="importFile" accept=".json">
-        <button class="btn btn-danger" id="clearData" style="margin-top: 8px;">⚠ 清空所有数据</button>
+        <button class="btn btn-danger" id="clearData" style="margin-top: 8px;" data-i18n="btn_clear_data">⚠ 清空所有数据</button>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">📚 数据字典</div>
+      <div class="card-title" data-i18n="settings_dict">📚 数据字典</div>
       <div style="font-size: 13px; color: var(--text-2); margin-bottom: 10px;">
         系统会记住你用过的物料/客户/型号,下次自动建议。
       </div>
@@ -1003,13 +1036,13 @@
 <div class="modal-bg" id="detailModal">
   <div class="modal">
     <h2>
-      <span>表单详情</span>
+      <span data-i18n="detail_title">表单详情</span>
       <button class="close" id="closeDetail">×</button>
     </h2>
     <div id="detailContent"></div>
     <div style="display: flex; gap: 8px; margin-top: 16px;">
-      <button class="btn btn-ghost" id="editForm" style="flex:1;">✏️ 编辑</button>
-      <button class="btn btn-danger" id="deleteForm" style="flex:1;">🗑 删除</button>
+      <button class="btn btn-ghost" id="editForm" style="flex:1;" data-i18n="btn_edit">✏️ 编辑</button>
+      <button class="btn btn-danger" id="deleteForm" style="flex:1;" data-i18n="btn_delete">🗑 删除</button>
     </div>
   </div>
 </div>
@@ -1019,7 +1052,7 @@
 <script>
 // ============== DATA LAYER ==============
 const DB_NAME = 'sparePartsDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 let db;
 
 function openDB() {
@@ -1192,6 +1225,278 @@ const Data = {
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ============== I18N (中英文) ==============
+const I18N = {
+  zh: {
+    app_title: 'Spare Parts Log',
+    app_subtitle: 'Service Department · Daily Requisition',
+    tab_add: '+ 新增',
+    tab_logs: '记录',
+    tab_stats: '统计',
+    tab_settings: '设置',
+    
+    card_scan: '📷 扫描表单（可选）',
+    btn_camera: '拍 照',
+    btn_camera_hint: '现场拍新表',
+    btn_gallery: '相 册',
+    btn_gallery_hint: '从手机选已有照片',
+    
+    card_form_info: '📋 表单信息',
+    label_company: '公司 Company',
+    label_date: '日期',
+    label_refno: 'Ref No',
+    label_tech: '技术员 Technician',
+    label_customer: '客户名 Customer',
+    label_model: '机器型号 Model',
+    placeholder_company: '点上方按钮或手动输入',
+    placeholder_tech: '点上方按钮快速选择,或手动输入',
+    placeholder_customer: '点上方常用客户,或手动输入',
+    placeholder_model: '点上方常用型号,或手动输入',
+    
+    card_items: '🔧 物料清单 Items',
+    quick_parts_label: '⚡ 快捷添加（点一下加 1 件）',
+    quick_parts_empty: '输入过的物料会出现在这里,用得越多越方便',
+    btn_add_item: '+ 手动添加物料',
+    placeholder_part_name: '物料名（如:Drum）',
+    placeholder_qty: '数量',
+    placeholder_price: '单价',
+    items_total: '共 {qty} 件 · RM {amount}',
+    
+    btn_save: '💾 保 存 这 张 表',
+    btn_update: '💾 更 新 这 张 表',
+    
+    // Logs
+    tile_month_forms: '本月表单',
+    tile_month_forms_unit: '张',
+    tile_month_items: '本月物料',
+    tile_month_items_unit: '件总数',
+    logs_title: '领用记录',
+    logs_empty: '本月还没有记录',
+    
+    // Detail
+    detail_title: '表单详情',
+    detail_items_label: '物料',
+    detail_units: '件',
+    btn_edit: '✏️ 编辑',
+    btn_delete: '🗑 删除',
+    
+    // Stats
+    stats_range: '📅 统计范围',
+    range_thismonth: '本月',
+    range_lastmonth: '上月',
+    range_last7: '近7天',
+    range_last30: '近30天',
+    range_custom: '自定义',
+    range_from: '从',
+    range_to: '到',
+    label_company_filter: '公司筛选',
+    filter_all: '全部',
+    
+    tile_amount: '总金额',
+    tile_qty: '物料件数',
+    tile_qty_unit: '总件数',
+    
+    stats_breakdown: '📊 分类统计',
+    stat_parts: '物料',
+    stat_customers: '客户',
+    stat_models: '型号',
+    stat_techs: '技术员',
+    stat_companies: '公司',
+    stats_empty: '所选日期范围内没有数据',
+    
+    stats_trend: '每日趋势',
+    
+    // Settings
+    settings_api: '🔑 OpenAI GPT-4o',
+    settings_api_label: 'OpenAI API Key',
+    settings_api_hint: '前往 platform.openai.com/api-keys 创建 API Key。每张表识别约 RM 0.04（4 仙）。GPT-4o 是当前最准的图像识别 AI。⚠️ Key 只存在你浏览器本地。',
+    btn_save_apikey: '保存 API Key',
+    
+    settings_prices: '💰 物料价格表',
+    settings_prices_hint: '每家公司价格独立。在新增表单时填的价格会自动保存到对应公司的价格表。',
+    placeholder_new_price_name: '物料名（如:DRUM）',
+    
+    settings_techs: '👥 技术员名单',
+    settings_techs_hint: '管理"新增"页的快捷按钮。每行一个名字,点保存生效。',
+    btn_save_techs: '保存名单',
+    
+    settings_data: '💾 数据',
+    btn_export_csv: '📊 导出 CSV（给老板看）',
+    btn_export_json: '📦 导出 JSON 备份',
+    btn_import_json: '📥 导入 JSON 备份',
+    btn_clear_data: '⚠ 清空所有数据',
+    
+    settings_dict: '📚 数据字典',
+    settings_dict_hint: '系统会记住你用过的物料/客户/型号,下次自动建议。',
+    
+    // Toasts
+    toast_saved: '已保存',
+    toast_updated: '已更新',
+    toast_deleted: '已删除',
+    toast_required_date: '请填写日期',
+    toast_required_company: '请填写公司',
+    toast_required_items: '至少添加一项物料',
+    toast_no_data: '暂无数据',
+    toast_csv_done: '✓ CSV 已下载',
+    toast_backup_done: '✓ 备份已下载',
+    
+    confirm_delete: '确定删除这张表单吗?',
+    confirm_clear: '⚠ 此操作会删除所有表单和字典。确定吗?',
+    confirm_clear2: '再次确认:真的删除所有数据?',
+  },
+  en: {
+    app_title: 'Spare Parts Log',
+    app_subtitle: 'Service Department · Daily Requisition',
+    tab_add: '+ New',
+    tab_logs: 'Logs',
+    tab_stats: 'Stats',
+    tab_settings: 'Settings',
+    
+    card_scan: '📷 Scan Form (Optional)',
+    btn_camera: 'Camera',
+    btn_camera_hint: 'Take new photo',
+    btn_gallery: 'Gallery',
+    btn_gallery_hint: 'Pick from phone',
+    
+    card_form_info: '📋 Form Info',
+    label_company: 'Company',
+    label_date: 'Date',
+    label_refno: 'Ref No',
+    label_tech: 'Technician',
+    label_customer: 'Customer',
+    label_model: 'Model',
+    placeholder_company: 'Tap button or type',
+    placeholder_tech: 'Tap button or type',
+    placeholder_customer: 'Tap a frequent customer or type',
+    placeholder_model: 'Tap a frequent model or type',
+    
+    card_items: '🔧 Items',
+    quick_parts_label: '⚡ Quick Add (tap to add 1)',
+    quick_parts_empty: 'Parts you used will appear here. The more you use, the faster it gets.',
+    btn_add_item: '+ Add Item Manually',
+    placeholder_part_name: 'Part name (e.g. Drum)',
+    placeholder_qty: 'Qty',
+    placeholder_price: 'Price',
+    items_total: '{qty} pcs · RM {amount}',
+    
+    btn_save: '💾 Save Form',
+    btn_update: '💾 Update Form',
+    
+    tile_month_forms: 'Forms (Month)',
+    tile_month_forms_unit: 'forms',
+    tile_month_items: 'Items (Month)',
+    tile_month_items_unit: 'pieces',
+    logs_title: 'Requisitions',
+    logs_empty: 'No records this month',
+    
+    detail_title: 'Form Detail',
+    detail_items_label: 'Items',
+    detail_units: 'pcs',
+    btn_edit: '✏️ Edit',
+    btn_delete: '🗑 Delete',
+    
+    stats_range: '📅 Date Range',
+    range_thismonth: 'This Month',
+    range_lastmonth: 'Last Month',
+    range_last7: 'Last 7 Days',
+    range_last30: 'Last 30 Days',
+    range_custom: 'Custom',
+    range_from: 'From',
+    range_to: 'To',
+    label_company_filter: 'Filter by Company',
+    filter_all: 'All',
+    
+    tile_amount: 'Total Amount',
+    tile_qty: 'Items',
+    tile_qty_unit: 'total pieces',
+    
+    stats_breakdown: '📊 Breakdown',
+    stat_parts: 'Parts',
+    stat_customers: 'Customers',
+    stat_models: 'Models',
+    stat_techs: 'Technicians',
+    stat_companies: 'Companies',
+    stats_empty: 'No data in selected range',
+    
+    stats_trend: 'Daily Trend',
+    
+    settings_api: '🔑 OpenAI GPT-4o',
+    settings_api_label: 'OpenAI API Key',
+    settings_api_hint: 'Go to platform.openai.com/api-keys to create. About RM 0.04 per scan. GPT-4o is the most accurate image AI. ⚠️ Key stored only in your browser.',
+    btn_save_apikey: 'Save API Key',
+    
+    settings_prices: '💰 Part Prices',
+    settings_prices_hint: 'Prices are per company. Prices entered in forms auto-save here.',
+    placeholder_new_price_name: 'Part name (e.g. DRUM)',
+    
+    settings_techs: '👥 Technician List',
+    settings_techs_hint: 'Manages quick buttons on New page. One name per line.',
+    btn_save_techs: 'Save List',
+    
+    settings_data: '💾 Data',
+    btn_export_csv: '📊 Export CSV (for boss)',
+    btn_export_json: '📦 Export JSON backup',
+    btn_import_json: '📥 Import JSON backup',
+    btn_clear_data: '⚠ Clear All Data',
+    
+    settings_dict: '📚 Dictionary',
+    settings_dict_hint: 'System remembers parts/customers/models you used, auto-suggests next time.',
+    
+    toast_saved: 'Saved',
+    toast_updated: 'Updated',
+    toast_deleted: 'Deleted',
+    toast_required_date: 'Please fill in date',
+    toast_required_company: 'Please fill in company',
+    toast_required_items: 'Add at least one item',
+    toast_no_data: 'No data',
+    toast_csv_done: '✓ CSV downloaded',
+    toast_backup_done: '✓ Backup downloaded',
+    
+    confirm_delete: 'Delete this form?',
+    confirm_clear: '⚠ This will delete all forms and dictionary. Sure?',
+    confirm_clear2: 'Confirm again: really delete all?',
+  }
+};
+
+let currentLang = localStorage.getItem('lang') || 'zh';
+
+function t(key, vars) {
+  let s = (I18N[currentLang] && I18N[currentLang][key]) || I18N.zh[key] || key;
+  if (vars) {
+    Object.keys(vars).forEach(k => { s = s.replace(`{${k}}`, vars[k]); });
+  }
+  return s;
+}
+
+function applyI18n() {
+  // 所有有 data-i18n 的元素更新文本
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    if (key) el.textContent = t(key);
+  });
+  // placeholder
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  // 重新渲染当前 tab
+  const activeTab = document.querySelector('.tab.active')?.dataset.tab;
+  if (activeTab === 'logs') renderLogs();
+  if (activeTab === 'stats') renderStats();
+  if (activeTab === 'add') {
+    updateItemsTotal();
+    refreshQuickButtons();
+  }
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('lang', lang);
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+  applyI18n();
 }
 
 function showToast(msg) {
@@ -1529,22 +1834,42 @@ setupAutocomplete(document.getElementById('inModel'), document.getElementById('m
 // 公司按钮交互 - 切换公司会自动重算所有物料价格
 document.querySelectorAll('.company-btn').forEach(btn => {
   btn.addEventListener('click', async () => {
-    document.querySelectorAll('.company-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
     document.getElementById('inCompany').value = btn.dataset.company;
-    
-    // 刷新所有已存在物料行的价格(用新公司的价格)
-    const rows = [...itemsContainer.querySelectorAll('.item-row')];
-    for (const row of rows) {
-      const name = row.querySelector('.item-name').value.trim();
-      if (name) {
-        const price = await Data.getPrice(btn.dataset.company, name);
-        if (price > 0) row.querySelector('.item-price').value = price.toFixed(2);
-      }
-    }
-    updateItemsTotal();
+    syncCompanyButtons();
+    await refreshItemPrices();
   });
 });
+
+// 输入框变化时同步按钮高亮
+document.getElementById('inCompany').addEventListener('input', () => {
+  syncCompanyButtons();
+});
+document.getElementById('inCompany').addEventListener('blur', async () => {
+  await refreshItemPrices();
+});
+
+// 同步公司按钮高亮(根据输入框值)
+function syncCompanyButtons() {
+  const value = document.getElementById('inCompany').value.trim().toLowerCase();
+  document.querySelectorAll('.company-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.company.toLowerCase() === value);
+  });
+}
+
+// 切换公司时重新填入物料价格
+async function refreshItemPrices() {
+  const company = document.getElementById('inCompany').value.trim();
+  if (!company) return;
+  const rows = [...itemsContainer.querySelectorAll('.item-row')];
+  for (const row of rows) {
+    const name = row.querySelector('.item-name').value.trim();
+    if (name) {
+      const price = await Data.getPrice(company, name);
+      if (price > 0) row.querySelector('.item-price').value = price.toFixed(2);
+    }
+  }
+  updateItemsTotal();
+}
 
 // ============== QUICK BUTTONS ==============
 
@@ -1656,12 +1981,23 @@ const galleryInput = document.getElementById('galleryInput');
 const ocrStatus = document.getElementById('ocrStatus');
 const previewImg = document.getElementById('previewImg');
 
+// 保存当前上传的照片(压缩后的 base64),保存表单时一起存入数据库
+let currentPhotoBase64 = null;
+
 async function handleImageFile(file) {
   if (!file) return;
   
   const url = URL.createObjectURL(file);
   previewImg.src = url;
   previewImg.classList.remove('hidden');
+  
+  // 压缩并保存照片(用于保存到记录)
+  try {
+    const thumbBlob = await compressImage(file, 1200, 0.75);
+    currentPhotoBase64 = await fileToBase64(thumbBlob);
+  } catch (e) {
+    currentPhotoBase64 = null;
+  }
   
   ocrStatus.className = 'ocr-status loading';
   ocrStatus.innerHTML = '<span class="spinner"></span>识别中...请稍候';
@@ -1676,12 +2012,11 @@ async function handleImageFile(file) {
     if (parsed.customer) document.getElementById('inCustomer').value = parsed.customer;
     if (parsed.model) document.getElementById('inModel').value = parsed.model;
     
-    // 自动选择公司按钮
+    // OCR 识别到的公司填入输入框 + 自动同步按钮
     if (parsed.company) {
-      const matchBtn = [...document.querySelectorAll('.company-btn')].find(b => 
-        b.dataset.company.toLowerCase() === parsed.company.toLowerCase()
-      );
-      if (matchBtn) matchBtn.click();
+      document.getElementById('inCompany').value = parsed.company;
+      syncCompanyButtons();
+      await refreshItemPrices();
     }
     
     if (parsed.items.length) {
@@ -1690,13 +2025,7 @@ async function handleImageFile(file) {
     }
     
     ocrStatus.className = 'ocr-status success';
-    ocrStatus.innerHTML = `
-      ✓ 识别完成,检测到 ${parsed.items.length} 项物料 · 请检查并修改
-      <details style="margin-top: 10px; text-align: left; font-size: 12px;">
-        <summary style="cursor: pointer; color: var(--accent);">📋 点击查看 OCR 原始文字（调试用）</summary>
-        <pre style="margin-top: 8px; padding: 10px; background: var(--bg); border-radius: 6px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-2); line-height: 1.5;">${escapeHtml(text || '(空)')}</pre>
-      </details>
-    `;
+    ocrStatus.innerHTML = `✓ 识别完成,检测到 ${parsed.items.length} 项物料 · 请检查并修改`;
   } catch (err) {
     ocrStatus.className = 'ocr-status error';
     ocrStatus.innerHTML = '✗ ' + err.message;
@@ -1716,25 +2045,32 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   const model = document.getElementById('inModel').value.trim();
   const items = getItems();
   
-  if (!date) { showToast('请填写日期'); return; }
-  if (!company) { showToast('请选择公司 (OBC / Plotech / E-Document)'); return; }
-  if (items.length === 0) { showToast('至少添加一项物料'); return; }
+  if (!date) { showToast(t('toast_required_date')); return; }
+  if (!company) { showToast(t('toast_required_company')); return; }
+  if (items.length === 0) { showToast(t('toast_required_items')); return; }
   
   const isEditing = document.getElementById('saveBtn').dataset.editId;
   const formData = {
     date, company, refNo, tech, customer, model, items,
+    photo: currentPhotoBase64 || null,
     createdAt: Date.now()
   };
   
   if (isEditing) {
     formData.id = parseInt(isEditing);
+    // 如果没新拍照,保留原照片
+    if (!currentPhotoBase64) {
+      const all = await Data.getAllForms();
+      const old = all.find(x => x.id === formData.id);
+      if (old?.photo) formData.photo = old.photo;
+    }
     await Data.updateForm(formData);
     document.getElementById('saveBtn').removeAttribute('data-edit-id');
-    document.getElementById('saveBtn').textContent = '💾 保 存 这 张 表';
-    showToast('✓ 已更新');
+    document.getElementById('saveBtn').textContent = t('btn_save');
+    showToast('✓ ' + t('toast_updated'));
   } else {
     await Data.addForm(formData);
-    showToast('✓ 已保存');
+    showToast('✓ ' + t('toast_saved'));
   }
   
   // Update dictionaries
@@ -1749,6 +2085,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   }
   
   // Reset
+  currentPhotoBase64 = null;
   document.getElementById('inRefNo').value = '';
   document.getElementById('inCustomer').value = '';
   document.getElementById('inModel').value = '';
@@ -1837,19 +2174,34 @@ async function openDetail(id) {
   const totalQty = f.items.reduce((s, it) => s + (it.qty || 0), 0);
   
   document.getElementById('detailContent').innerHTML = `
-    <div style="font-size: 13px; color: var(--text-3); margin-bottom: 4px;">${f.refNo ? 'Ref #' + escapeHtml(f.refNo) + ' · ' : ''}${f.date}${f.tech ? ' · 👤 ' + escapeHtml(f.tech) : ''}</div>
+    ${f.photo ? `
+      <div style="margin-bottom: 14px; text-align: center;">
+        <img src="data:image/jpeg;base64,${f.photo}" alt="原始表单" style="max-width: 100%; max-height: 360px; border-radius: 8px; border: 1px solid var(--line); cursor: pointer;" onclick="window.open(this.src, '_blank')">
+        <div style="font-size: 10px; color: var(--text-3); margin-top: 4px;">📷 点击查看大图</div>
+      </div>
+    ` : ''}
+    <div style="font-size: 13px; color: var(--text-3); margin-bottom: 4px;">
+      ${f.company ? `<span class="company-badge company-${f.company.toLowerCase().replace(/[^a-z]/g, '')}">${escapeHtml(f.company)}</span>` : ''}
+      ${f.refNo ? 'Ref #' + escapeHtml(f.refNo) + ' · ' : ''}${f.date}${f.tech ? ' · 👤 ' + escapeHtml(f.tech) : ''}
+    </div>
     <div style="font-size: 18px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(f.customer || '(无客户)')}</div>
     ${f.model ? `<div style="display: inline-block; background: var(--bg-3); color: var(--accent); padding: 4px 10px; border-radius: 5px; font-size: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 600; margin-bottom: 14px;">${escapeHtml(f.model)}</div>` : ''}
     
-    <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); margin: 14px 0 8px;">物料 · ${f.items.length} 项 · 共 ${totalQty} 件</div>
+    <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); margin: 14px 0 8px;">${t('detail_items_label')} · ${f.items.length} · ${totalQty} ${t('detail_units')}${(() => {
+      const total = f.items.reduce((s, it) => s + (it.qty || 0) * (it.price || 0), 0);
+      return total > 0 ? ` · <span style="color: var(--accent-2); font-weight: 600;">RM ${total.toFixed(2)}</span>` : '';
+    })()}</div>
     
     <div style="background: var(--bg); border-radius: 8px; padding: 4px 14px;">
       ${f.items.map(it => `
         <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line-soft);">
           <span>${escapeHtml(it.name)}</span>
-          <span style="color: var(--accent); font-family: 'JetBrains Mono', monospace; font-weight: 600;">×${it.qty}</span>
+          <div style="text-align: right;">
+            <span style="color: var(--accent); font-family: 'JetBrains Mono', monospace; font-weight: 600;">×${it.qty}</span>
+            ${it.price > 0 ? `<div style="font-size: 11px; color: var(--accent-2); font-family: 'JetBrains Mono', monospace;">RM ${(it.qty * it.price).toFixed(2)}</div>` : ''}
+          </div>
         </div>
-      `).join('').replace(/border-bottom[^;]+;\s*">(?=\s*<span>[^<]+<\/span>\s*<span[^>]*>[^<]+<\/span>\s*<\/div>\s*)$/, '">')}
+      `).join('')}
     </div>
   `;
   
@@ -1871,10 +2223,7 @@ document.getElementById('editForm').addEventListener('click', async () => {
   document.getElementById('inCustomer').value = f.customer || '';
   document.getElementById('inModel').value = f.model || '';
   document.getElementById('inCompany').value = f.company || '';
-  // 选中公司按钮
-  document.querySelectorAll('.company-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.company === (f.company || ''));
-  });
+  syncCompanyButtons();
   clearItemRows();
   f.items.forEach(it => addItemRow(it.name, it.qty, it.price !== undefined ? it.price : null));
   if (f.items.length === 0) addItemRow();
@@ -2318,6 +2667,13 @@ document.getElementById('clearData').addEventListener('click', async () => {
   
   // 渲染所有快捷按钮
   await refreshQuickButtons();
+  
+  // 绑定语言切换按钮
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => setLang(btn.dataset.lang));
+  });
+  // 应用保存的语言
+  setLang(currentLang);
   
   // Register service worker (sw.js needs to be in the same folder)
   if ('serviceWorker' in navigator) {
