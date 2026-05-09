@@ -741,6 +741,27 @@
     border-color: var(--accent);
     font-weight: 600;
   }
+  
+  .tech-report-btn {
+    background: var(--bg-3);
+    color: var(--text);
+    border: 2px solid var(--line);
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex: 1;
+    min-width: 80px;
+  }
+  .tech-report-btn:active { transform: scale(0.97); }
+  .tech-report-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
 
   .stat-tabs {
     display: flex;
@@ -880,6 +901,12 @@
 
   <!-- LOGS TAB -->
   <section id="tab-logs" class="tab-content hidden">
+    <div class="card">
+      <div class="card-title" data-i18n="search_title">🔍 搜索</div>
+      <input type="text" id="searchInput" placeholder="Ref No / 客户 / 物料 / 技术员..." data-i18n-placeholder="search_placeholder" autocomplete="off">
+      <div id="searchResults" style="margin-top: 12px;"></div>
+    </div>
+
     <div class="summary">
       <div class="tile">
         <div class="label" data-i18n="tile_month_forms">本月表单</div>
@@ -895,7 +922,7 @@
 
     <div class="card">
       <div class="card-title">
-        <span>领用记录</span>
+        <span data-i18n="logs_title">领用记录</span>
         <select class="month-picker" id="logsMonthPicker"></select>
       </div>
       <div id="logsList"></div>
@@ -960,6 +987,17 @@
       </div>
 
       <div id="statsList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-i18n="tech_report">👤 技术员日报</div>
+      <div style="font-size: 12px; color: var(--text-2); margin-bottom: 10px;" data-i18n="tech_report_hint">
+        选一个技术员,看他在所选日期范围内用了什么、花了多少
+      </div>
+      <div id="techReportButtons" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
+        <!-- JS 动态填充技术员按钮 -->
+      </div>
+      <div id="techReportResult"></div>
     </div>
 
     <div class="card">
@@ -1275,6 +1313,12 @@ const I18N = {
     logs_title: '领用记录',
     logs_empty: '本月还没有记录',
     
+    // Search
+    search_title: '🔍 搜索',
+    search_placeholder: 'Ref No / 客户 / 物料 / 技术员...',
+    search_no_results: '没有匹配的记录',
+    search_found: '找到 ',
+    
     // Detail
     detail_title: '表单详情',
     detail_items_label: '物料',
@@ -1307,6 +1351,17 @@ const I18N = {
     stats_empty: '所选日期范围内没有数据',
     
     stats_trend: '每日趋势',
+    
+    // Tech Report
+    tech_report: '👤 技术员日报',
+    tech_report_hint: '选一个技术员,看他在所选日期范围内用了什么、花了多少',
+    tech_report_select: '请选择一个技术员',
+    tech_report_no_data: '此技术员在所选范围内没有记录',
+    tech_report_summary: '总计',
+    tech_report_forms: '张表',
+    tech_report_amount: '金额',
+    tech_report_items: '物料',
+    tech_report_pieces: '件',
     
     // Settings
     settings_api: '🔑 OpenAI GPT-4o',
@@ -1391,6 +1446,11 @@ const I18N = {
     logs_title: 'Requisitions',
     logs_empty: 'No records this month',
     
+    search_title: '🔍 Search',
+    search_placeholder: 'Ref No / Customer / Part / Technician...',
+    search_no_results: 'No matching records',
+    search_found: 'Found ',
+    
     detail_title: 'Form Detail',
     detail_items_label: 'Items',
     detail_units: 'pcs',
@@ -1421,6 +1481,16 @@ const I18N = {
     stats_empty: 'No data in selected range',
     
     stats_trend: 'Daily Trend',
+    
+    tech_report: '👤 Technician Report',
+    tech_report_hint: 'Pick a technician to see what they used and total cost',
+    tech_report_select: 'Please pick a technician',
+    tech_report_no_data: 'This technician has no records in selected range',
+    tech_report_summary: 'Total',
+    tech_report_forms: 'forms',
+    tech_report_amount: 'Amount',
+    tech_report_items: 'Parts',
+    tech_report_pieces: 'pcs',
     
     settings_api: '🔑 OpenAI GPT-4o',
     settings_api_label: 'OpenAI API Key',
@@ -2162,6 +2232,69 @@ async function renderLogs() {
 
 document.getElementById('logsMonthPicker').addEventListener('change', renderLogs);
 
+// ============== SEARCH ==============
+let searchTimer;
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => doSearch(e.target.value.trim()), 200);
+});
+
+async function doSearch(query) {
+  const container = document.getElementById('searchResults');
+  if (!query) { container.innerHTML = ''; return; }
+  
+  const all = await Data.getAllForms();
+  const q = query.toLowerCase();
+  
+  // 多字段模糊匹配
+  const results = all.filter(f => {
+    if ((f.refNo || '').toLowerCase().includes(q)) return true;
+    if ((f.customer || '').toLowerCase().includes(q)) return true;
+    if ((f.tech || '').toLowerCase().includes(q)) return true;
+    if ((f.model || '').toLowerCase().includes(q)) return true;
+    if ((f.company || '').toLowerCase().includes(q)) return true;
+    if ((f.items || []).some(it => (it.name || '').toLowerCase().includes(q))) return true;
+    return false;
+  });
+  
+  if (results.length === 0) {
+    container.innerHTML = `<div style="font-size: 13px; color: var(--text-3); padding: 12px; text-align: center;">${t('search_no_results')}</div>`;
+    return;
+  }
+  
+  container.innerHTML = `
+    <div style="font-size: 11px; color: var(--text-3); margin-bottom: 8px; font-family: 'JetBrains Mono', monospace;">
+      ${t('search_found')} ${results.length}
+    </div>
+  ` + results.slice(0, 20).map(f => {
+    const total = f.items.reduce((s, it) => s + (it.qty || 0) * (it.price || 0), 0);
+    return `
+      <div class="log-entry" data-id="${f.id}" style="cursor: pointer;">
+        <div class="head">
+          <div>
+            <div class="ref">
+              ${f.company ? `<span class="company-badge company-${f.company.toLowerCase().replace(/[^a-z]/g, '')}">${escapeHtml(f.company)}</span>` : ''}
+              ${f.refNo ? '#' + escapeHtml(f.refNo) : ''}
+              ${f.tech ? (f.refNo ? ' · ' : '') + '👤 ' + escapeHtml(f.tech) : ''}
+            </div>
+            <div class="customer">${escapeHtml(f.customer || '(无客户)')}</div>
+          </div>
+          ${f.model ? `<div class="model">${escapeHtml(f.model)}</div>` : ''}
+        </div>
+        <div class="items">
+          ${f.items.map(it => `<div class="item-tag">${escapeHtml(it.name)}<span class="qty">×${it.qty}</span></div>`).join('')}
+        </div>
+        <div class="date">${f.date}${total > 0 ? ` · <span style="color: var(--accent-2); font-weight: 600;">RM ${total.toFixed(2)}</span>` : ''}</div>
+      </div>
+    `;
+  }).join('');
+  
+  // 点击进详情
+  container.querySelectorAll('.log-entry').forEach(el => {
+    el.addEventListener('click', () => openDetail(parseInt(el.dataset.id)));
+  });
+}
+
 // ============== DETAIL MODAL ==============
 let currentFormId = null;
 
@@ -2421,6 +2554,128 @@ async function renderStats() {
   `).join('');
   
   renderTrendChart(inRange, from, to);
+  await renderTechReport(inRange);
+}
+
+// ============== TECH REPORT ==============
+let selectedTechForReport = '';
+
+async function renderTechReport(inRangeForms) {
+  const techs = await Data.getSetting('techList') || DEFAULT_TECHS;
+  const btnContainer = document.getElementById('techReportButtons');
+  
+  btnContainer.innerHTML = techs.map(name => 
+    `<button class="tech-report-btn ${name === selectedTechForReport ? 'active' : ''}" data-tech="${escapeHtml(name)}">${escapeHtml(name)}</button>`
+  ).join('');
+  
+  btnContainer.querySelectorAll('.tech-report-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedTechForReport = btn.dataset.tech;
+      btnContainer.querySelectorAll('.tech-report-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTechReportContent(inRangeForms);
+    });
+  });
+  
+  if (selectedTechForReport) {
+    renderTechReportContent(inRangeForms);
+  } else {
+    document.getElementById('techReportResult').innerHTML = 
+      `<div style="font-size: 13px; color: var(--text-3); padding: 12px; text-align: center;">${t('tech_report_select')}</div>`;
+  }
+}
+
+function renderTechReportContent(allInRange) {
+  const container = document.getElementById('techReportResult');
+  // 只看选定技术员的表单
+  const techForms = allInRange.filter(f => (f.tech || '').trim().toLowerCase() === selectedTechForReport.toLowerCase());
+  
+  if (techForms.length === 0) {
+    container.innerHTML = `<div style="font-size: 13px; color: var(--text-3); padding: 12px; text-align: center;">${t('tech_report_no_data')}</div>`;
+    return;
+  }
+  
+  // 汇总:每种物料用了多少 + 总价
+  const partStats = {};
+  let totalAmount = 0, totalQty = 0;
+  
+  techForms.forEach(f => {
+    f.items.forEach(it => {
+      const norm = normalizePart(it.name);
+      if (!norm) return;
+      if (!partStats[norm]) partStats[norm] = { name: it.name, qty: 0, amount: 0 };
+      partStats[norm].qty += it.qty || 0;
+      partStats[norm].amount += (it.qty || 0) * (it.price || 0);
+      totalQty += it.qty || 0;
+      totalAmount += (it.qty || 0) * (it.price || 0);
+    });
+  });
+  
+  const sortedParts = Object.values(partStats).sort((a, b) => b.amount - a.amount || b.qty - a.qty);
+  
+  // 每天列表
+  const byDate = {};
+  techForms.forEach(f => {
+    if (!byDate[f.date]) byDate[f.date] = [];
+    byDate[f.date].push(f);
+  });
+  const dates = Object.keys(byDate).sort().reverse();
+  
+  container.innerHTML = `
+    <!-- 顶部汇总 -->
+    <div style="background: var(--bg); padding: 14px; border-radius: 8px; margin-bottom: 14px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+        <div>
+          <div style="font-size: 11px; color: var(--text-3); margin-bottom: 4px;">${t('tech_report_forms')}</div>
+          <div style="font-size: 22px; font-weight: 700; color: var(--accent); font-family: 'JetBrains Mono', monospace;">${techForms.length}</div>
+        </div>
+        <div>
+          <div style="font-size: 11px; color: var(--text-3); margin-bottom: 4px;">${t('tech_report_pieces')}</div>
+          <div style="font-size: 22px; font-weight: 700; color: var(--accent-2); font-family: 'JetBrains Mono', monospace;">${totalQty}</div>
+        </div>
+        <div>
+          <div style="font-size: 11px; color: var(--text-3); margin-bottom: 4px;">RM</div>
+          <div style="font-size: 22px; font-weight: 700; color: var(--green); font-family: 'JetBrains Mono', monospace;">${totalAmount.toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 物料汇总 -->
+    <div style="font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">📦 ${t('tech_report_items')}</div>
+    ${sortedParts.map(p => `
+      <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: var(--bg); border-radius: 6px; margin-bottom: 4px;">
+        <span style="font-size: 13px;">${escapeHtml(p.name)}</span>
+        <div style="text-align: right;">
+          <span style="color: var(--accent); font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px;">×${p.qty}</span>
+          ${p.amount > 0 ? ` <span style="color: var(--accent-2); font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; margin-left: 8px;">RM ${p.amount.toFixed(2)}</span>` : ''}
+        </div>
+      </div>
+    `).join('')}
+    
+    <!-- 按日期分组的明细 -->
+    <div style="font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em; margin: 14px 0 8px;">📅 ${dates.length} ${currentLang === 'en' ? 'days' : '天'}</div>
+    ${dates.map(date => {
+      const forms = byDate[date];
+      const dayAmount = forms.reduce((s, f) => s + f.items.reduce((s2, it) => s2 + (it.qty || 0) * (it.price || 0), 0), 0);
+      const dayQty = forms.reduce((s, f) => s + f.items.reduce((s2, it) => s2 + (it.qty || 0), 0), 0);
+      return `
+        <div style="background: var(--bg); padding: 10px 12px; border-radius: 6px; margin-bottom: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 13px;">
+            <span style="font-weight: 600;">${date}</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px;">
+              <span style="color: var(--text-3);">${forms.length} ${t('tech_report_forms')} · ${dayQty} ${t('tech_report_pieces')}</span>
+              ${dayAmount > 0 ? ` · <span style="color: var(--accent-2); font-weight: 600;">RM ${dayAmount.toFixed(2)}</span>` : ''}
+            </span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
+            ${forms.map(f => f.items.map(it => 
+              `<span style="background: var(--bg-3); padding: 2px 6px; border-radius: 3px; font-size: 11px; color: var(--text-2);">${escapeHtml(it.name)}<span style="color: var(--accent); font-weight: 600; margin-left: 3px;">×${it.qty}</span></span>`
+            ).join('')).join('')}
+          </div>
+        </div>
+      `;
+    }).join('')}
+  `;
 }
 
 function renderTrendChart(forms, from, to) {
