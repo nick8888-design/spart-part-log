@@ -222,6 +222,33 @@
   .upload-zone .text { font-weight: 500; }
   .upload-zone .hint { font-size: 11px; color: var(--text-3); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
   
+  /* Company buttons - 三家公司,大按钮便于选 */
+  .company-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .company-btn {
+    background: var(--bg-3);
+    color: var(--text);
+    border: 2px solid var(--line);
+    padding: 12px 8px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.02em;
+  }
+  .company-btn:active { transform: scale(0.97); }
+  .company-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
+
   /* Quick buttons (techs/customers/models) */
   .quick-techs, .quick-chips {
     display: flex;
@@ -425,6 +452,18 @@
     color: var(--text-3);
     margin-bottom: 2px;
   }
+  .company-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-right: 6px;
+    letter-spacing: 0.05em;
+  }
+  .company-obc { background: rgba(78, 205, 196, 0.2); color: #4ecdc4; }
+  .company-plotech { background: rgba(255, 169, 77, 0.2); color: #ffa94d; }
+  .company-edocument { background: rgba(199, 122, 199, 0.2); color: #c77ac7; }
   .log-entry .customer { font-weight: 600; font-size: 15px; }
   .log-entry .model {
     background: var(--bg-3);
@@ -659,6 +698,24 @@
     border-color: var(--accent);
     font-weight: 600;
   }
+  
+  .company-filter-btn {
+    background: var(--bg-3);
+    color: var(--text-2);
+    border: 1px solid var(--line-soft);
+    padding: 6px 12px;
+    border-radius: 14px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .company-filter-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
 
   .stat-tabs {
     display: flex;
@@ -722,6 +779,17 @@
 
     <div class="card">
       <div class="card-title">📋 表单信息</div>
+      
+      <div class="form-group">
+        <label class="field-label">公司 Company</label>
+        <div class="company-buttons">
+          <button type="button" class="company-btn" data-company="OBC">OBC</button>
+          <button type="button" class="company-btn" data-company="Plotech">Plotech</button>
+          <button type="button" class="company-btn" data-company="E-Document">E-Document</button>
+        </div>
+        <input type="hidden" id="inCompany" value="">
+      </div>
+      
       <div class="form-row">
         <div>
           <label class="field-label">日期</label>
@@ -822,6 +890,15 @@
           <input type="date" id="rangeTo">
         </div>
       </div>
+      <div style="margin-top: 12px;">
+        <label class="field-label">公司筛选</label>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button class="company-filter-btn active" data-company="all">全部</button>
+          <button class="company-filter-btn" data-company="OBC">OBC</button>
+          <button class="company-filter-btn" data-company="Plotech">Plotech</button>
+          <button class="company-filter-btn" data-company="E-Document">E-Document</button>
+        </div>
+      </div>
       <div id="rangeLabel" style="font-size: 12px; color: var(--text-3); margin-top: 6px; font-family: 'JetBrains Mono', monospace;"></div>
     </div>
 
@@ -842,10 +919,11 @@
       <div class="card-title">📊 分类统计</div>
       
       <div class="stat-tabs">
-        <button class="stat-tab active" data-stat="parts">按物料</button>
-        <button class="stat-tab" data-stat="customers">按客户</button>
-        <button class="stat-tab" data-stat="models">按型号</button>
-        <button class="stat-tab" data-stat="techs">按技术员</button>
+        <button class="stat-tab active" data-stat="parts">物料</button>
+        <button class="stat-tab" data-stat="customers">客户</button>
+        <button class="stat-tab" data-stat="models">型号</button>
+        <button class="stat-tab" data-stat="techs">技术员</button>
+        <button class="stat-tab" data-stat="companies">公司</button>
       </div>
 
       <div id="statsList"></div>
@@ -874,7 +952,12 @@
     <div class="card">
       <div class="card-title">💰 物料价格表</div>
       <div style="font-size: 12px; color: var(--text-2); margin-bottom: 10px;">
-        每种物料定价一次,以后输入物料名时自动填入价格。点物料行的"单价"填新值会自动更新这里。
+        每家公司价格独立。在新增表单时填的价格会自动保存到对应公司的价格表。
+      </div>
+      <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+        <button class="company-filter-btn active" data-pricecompany="OBC">OBC</button>
+        <button class="company-filter-btn" data-pricecompany="Plotech">Plotech</button>
+        <button class="company-filter-btn" data-pricecompany="E-Document">E-Document</button>
       </div>
       <div id="priceList" style="margin-bottom: 12px;"></div>
       <div style="display: grid; grid-template-columns: 1fr 90px 36px; gap: 6px;">
@@ -936,7 +1019,7 @@
 <script>
 // ============== DATA LAYER ==============
 const DB_NAME = 'sparePartsDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 let db;
 
 function openDB() {
@@ -956,9 +1039,13 @@ function openDB() {
         const s = d.createObjectStore('dict', { keyPath: ['type', 'name'] });
         s.createIndex('type', 'type');
       }
+      if (e.oldVersion < 3 && d.objectStoreNames.contains('prices')) {
+        d.deleteObjectStore('prices');
+      }
       if (!d.objectStoreNames.contains('prices')) {
-        // 物料价格表: { name: 'DRUM', price: 10.00 }
-        d.createObjectStore('prices', { keyPath: 'name' });
+        // 物料价格表: { company: 'OBC', name: 'DRUM', price: 10.00 }
+        const ps = d.createObjectStore('prices', { keyPath: ['company', 'name'] });
+        ps.createIndex('company', 'company');
       }
     };
     req.onsuccess = (e) => { db = e.target.result; resolve(db); };
@@ -1052,35 +1139,49 @@ const Data = {
       r.onerror = rej;
     });
   },
-  // 价格表
-  setPrice(name, price) {
+  // 价格表(按公司)
+  setPrice(company, name, price) {
     return new Promise((res, rej) => {
       const tx = db.transaction('prices', 'readwrite');
-      const r = tx.objectStore('prices').put({ name: name.trim(), price: parseFloat(price) || 0, updatedAt: Date.now() });
+      const r = tx.objectStore('prices').put({ 
+        company: company.trim(), 
+        name: name.trim(), 
+        price: parseFloat(price) || 0, 
+        updatedAt: Date.now() 
+      });
       r.onsuccess = () => res();
       r.onerror = rej;
     });
   },
-  getPrice(name) {
+  getPrice(company, name) {
     return new Promise((res) => {
       const tx = db.transaction('prices', 'readonly');
-      const r = tx.objectStore('prices').get(name.trim());
+      const r = tx.objectStore('prices').get([company.trim(), name.trim()]);
       r.onsuccess = () => res(r.result?.price || 0);
       r.onerror = () => res(0);
     });
   },
-  getAllPrices() {
+  getAllPrices(company = null) {
     return new Promise((res, rej) => {
       const tx = db.transaction('prices', 'readonly');
-      const r = tx.objectStore('prices').getAll();
-      r.onsuccess = () => res(r.result.sort((a,b) => a.name.localeCompare(b.name)));
+      const store = tx.objectStore('prices');
+      let r;
+      if (company) {
+        const idx = store.index('company');
+        r = idx.getAll(company.trim());
+      } else {
+        r = store.getAll();
+      }
+      r.onsuccess = () => res(r.result.sort((a,b) => 
+        (a.company || '').localeCompare(b.company || '') || a.name.localeCompare(b.name)
+      ));
       r.onerror = rej;
     });
   },
-  deletePrice(name) {
+  deletePrice(company, name) {
     return new Promise((res, rej) => {
       const tx = db.transaction('prices', 'readwrite');
-      const r = tx.objectStore('prices').delete(name.trim());
+      const r = tx.objectStore('prices').delete([company.trim(), name.trim()]);
       r.onsuccess = () => res();
       r.onerror = rej;
     });
@@ -1152,6 +1253,7 @@ async function ocrImage(file) {
 Extract the following and return ONLY valid JSON (no markdown, no explanation):
 
 {
+  "company": "OBC | Plotech | E-Document | empty (look at the company logo/name at TOP of form)",
   "date": "YYYY-MM-DD or empty string",
   "refNo": "reference number or empty",
   "tech": "technician/requestor name (look for REQUESTOR NAME field) or empty",
@@ -1162,6 +1264,13 @@ Extract the following and return ONLY valid JSON (no markdown, no explanation):
   ]
 }
 
+COMPANY DETECTION (very important):
+- The form header at the TOP shows the company name
+- "OBC OFFIX BUSINESS CENTRE" → "OBC"
+- "PLOTECH" or any name with PLOTECH → "Plotech"
+- "E-DOCUMENT SOLUTION" or any with E-DOCUMENT → "E-Document"
+- If unclear, leave empty
+
 CRITICAL DATE PARSING RULES:
 - Look at the DATE field at the top right of the form
 - The form is from Malaysia, so dates are ALWAYS in DD/MM/YYYY format
@@ -1169,7 +1278,6 @@ CRITICAL DATE PARSING RULES:
 - "2/5/2026" means 2 May 2026 = output "2026-05-02"
 - NEVER swap day and month
 - If only DD/MM/YY is shown, assume 20YY
-- Look at handwritten date carefully, including digits like "5" that may look like "S"
 
 OTHER RULES:
 - Read all rows in DESCRIPTION column (BOTH the consumable section AND the TONER section)
@@ -1215,7 +1323,7 @@ OTHER RULES:
 
 // Gemini 直接返回 JSON,这里只需简单解析
 async function parseFormText(text) {
-  const result = { date: '', refNo: '', customer: '', model: '', tech: '', items: [] };
+  const result = { company: '', date: '', refNo: '', customer: '', model: '', tech: '', items: [] };
   if (!text) return result;
   
   try {
@@ -1227,6 +1335,7 @@ async function parseFormText(text) {
     
     const parsed = JSON.parse(clean);
     
+    if (parsed.company) result.company = String(parsed.company).trim();
     if (parsed.date) result.date = String(parsed.date).trim();
     if (parsed.refNo) result.refNo = String(parsed.refNo).trim();
     if (parsed.tech) result.tech = String(parsed.tech).trim();
@@ -1296,8 +1405,9 @@ function addItemRow(name = '', qty = 1, price = null) {
   // 物料名变化时自动从价格库填入价格
   nameInput.addEventListener('blur', async () => {
     const name = nameInput.value.trim();
+    const company = document.getElementById('inCompany').value || 'OBC';
     if (name && !priceInput.value) {
-      const savedPrice = await Data.getPrice(name);
+      const savedPrice = await Data.getPrice(company, name);
       if (savedPrice > 0) {
         priceInput.value = savedPrice.toFixed(2);
         updateItemsTotal();
@@ -1308,9 +1418,10 @@ function addItemRow(name = '', qty = 1, price = null) {
   // 价格变化时,如果填了价格,记住它(写入价格库)
   priceInput.addEventListener('blur', async () => {
     const name = nameInput.value.trim();
+    const company = document.getElementById('inCompany').value || 'OBC';
     const price = parseFloat(priceInput.value) || 0;
     if (name && price > 0) {
-      await Data.setPrice(name, price);
+      await Data.setPrice(company, name, price);
     }
     updateItemsTotal();
   });
@@ -1326,7 +1437,8 @@ function addItemRow(name = '', qty = 1, price = null) {
   
   // 如果有价格库,自动填入
   if (name && price === null) {
-    Data.getPrice(name).then(p => {
+    const company = document.getElementById('inCompany').value || 'OBC';
+    Data.getPrice(company, name).then(p => {
       if (p > 0) {
         priceInput.value = p.toFixed(2);
         updateItemsTotal();
@@ -1413,6 +1525,26 @@ async function setupAutocomplete(input, sugBox, type) {
 setupAutocomplete(document.getElementById('inTech'), document.getElementById('techSuggestions'), 'tech');
 setupAutocomplete(document.getElementById('inCustomer'), document.getElementById('customerSuggestions'), 'customer');
 setupAutocomplete(document.getElementById('inModel'), document.getElementById('modelSuggestions'), 'model');
+
+// 公司按钮交互 - 切换公司会自动重算所有物料价格
+document.querySelectorAll('.company-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('.company-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('inCompany').value = btn.dataset.company;
+    
+    // 刷新所有已存在物料行的价格(用新公司的价格)
+    const rows = [...itemsContainer.querySelectorAll('.item-row')];
+    for (const row of rows) {
+      const name = row.querySelector('.item-name').value.trim();
+      if (name) {
+        const price = await Data.getPrice(btn.dataset.company, name);
+        if (price > 0) row.querySelector('.item-price').value = price.toFixed(2);
+      }
+    }
+    updateItemsTotal();
+  });
+});
 
 // ============== QUICK BUTTONS ==============
 
@@ -1544,6 +1676,14 @@ async function handleImageFile(file) {
     if (parsed.customer) document.getElementById('inCustomer').value = parsed.customer;
     if (parsed.model) document.getElementById('inModel').value = parsed.model;
     
+    // 自动选择公司按钮
+    if (parsed.company) {
+      const matchBtn = [...document.querySelectorAll('.company-btn')].find(b => 
+        b.dataset.company.toLowerCase() === parsed.company.toLowerCase()
+      );
+      if (matchBtn) matchBtn.click();
+    }
+    
     if (parsed.items.length) {
       clearItemRows();
       parsed.items.forEach(it => addItemRow(it.name, it.qty));
@@ -1569,6 +1709,7 @@ galleryInput.addEventListener('change', (e) => handleImageFile(e.target.files[0]
 // ============== ADD: Save ==============
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const date = document.getElementById('inDate').value;
+  const company = document.getElementById('inCompany').value || '';
   const refNo = document.getElementById('inRefNo').value.trim();
   const tech = document.getElementById('inTech').value.trim();
   const customer = document.getElementById('inCustomer').value.trim();
@@ -1576,11 +1717,12 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   const items = getItems();
   
   if (!date) { showToast('请填写日期'); return; }
+  if (!company) { showToast('请选择公司 (OBC / Plotech / E-Document)'); return; }
   if (items.length === 0) { showToast('至少添加一项物料'); return; }
   
   const isEditing = document.getElementById('saveBtn').dataset.editId;
   const formData = {
-    date, refNo, tech, customer, model, items,
+    date, company, refNo, tech, customer, model, items,
     createdAt: Date.now()
   };
   
@@ -1612,6 +1754,8 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   document.getElementById('inModel').value = '';
   document.getElementById('inTech').value = ''; // 3 人共用,清空
   document.getElementById('inDate').value = todayStr();
+  document.getElementById('inCompany').value = '';
+  document.querySelectorAll('.company-btn').forEach(b => b.classList.remove('active'));
   clearItemRows();
   addItemRow();
   previewImg.classList.add('hidden');
@@ -1655,7 +1799,11 @@ async function renderLogs() {
     <div class="log-entry" data-id="${f.id}">
       <div class="head">
         <div>
-          <div class="ref">${f.refNo ? '#' + escapeHtml(f.refNo) : ''}${f.tech ? (f.refNo ? ' · ' : '') + '👤 ' + escapeHtml(f.tech) : ''}</div>
+          <div class="ref">
+            ${f.company ? `<span class="company-badge company-${f.company.toLowerCase().replace(/[^a-z]/g, '')}">${escapeHtml(f.company)}</span>` : ''}
+            ${f.refNo ? '#' + escapeHtml(f.refNo) : ''}
+            ${f.tech ? (f.refNo ? ' · ' : '') + '👤 ' + escapeHtml(f.tech) : ''}
+          </div>
           <div class="customer">${escapeHtml(f.customer || '(无客户名)')}</div>
         </div>
         ${f.model ? `<div class="model">${escapeHtml(f.model)}</div>` : ''}
@@ -1663,7 +1811,10 @@ async function renderLogs() {
       <div class="items">
         ${f.items.map(it => `<div class="item-tag">${escapeHtml(it.name)}<span class="qty">×${it.qty}</span></div>`).join('')}
       </div>
-      <div class="date">${f.date}</div>
+      <div class="date">${f.date}${(() => {
+        const total = f.items.reduce((s, it) => s + (it.qty || 0) * (it.price || 0), 0);
+        return total > 0 ? ` · <span style="color: var(--accent-2); font-weight: 600;">RM ${total.toFixed(2)}</span>` : '';
+      })()}</div>
     </div>
   `).join('');
   
@@ -1719,6 +1870,11 @@ document.getElementById('editForm').addEventListener('click', async () => {
   document.getElementById('inTech').value = f.tech || '';
   document.getElementById('inCustomer').value = f.customer || '';
   document.getElementById('inModel').value = f.model || '';
+  document.getElementById('inCompany').value = f.company || '';
+  // 选中公司按钮
+  document.querySelectorAll('.company-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.company === (f.company || ''));
+  });
   clearItemRows();
   f.items.forEach(it => addItemRow(it.name, it.qty, it.price !== undefined ? it.price : null));
   if (f.items.length === 0) addItemRow();
@@ -1742,6 +1898,7 @@ document.getElementById('deleteForm').addEventListener('click', async () => {
 // ============== STATS TAB ==============
 let statMode = 'parts';
 let statRange = 'thisMonth';
+let statCompany = 'all';
 let trendChart;
 
 document.querySelectorAll('.stat-tab').forEach(b => {
@@ -1760,12 +1917,20 @@ document.querySelectorAll('.range-btn').forEach(b => {
     statRange = b.dataset.range;
     document.getElementById('customRange').style.display = (statRange === 'custom') ? 'flex' : 'none';
     if (statRange === 'custom') {
-      // 默认填本月
       const t = todayStr();
       const monthStart = t.slice(0, 7) + '-01';
       if (!document.getElementById('rangeFrom').value) document.getElementById('rangeFrom').value = monthStart;
       if (!document.getElementById('rangeTo').value) document.getElementById('rangeTo').value = t;
     }
+    renderStats();
+  });
+});
+
+document.querySelectorAll('.company-filter-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.company-filter-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    statCompany = b.dataset.company;
     renderStats();
   });
 });
@@ -1811,10 +1976,14 @@ async function renderStats() {
   const all = await Data.getAllForms();
   const { from, to } = getDateRange();
   
-  document.getElementById('rangeLabel').textContent = `${from} → ${to}`;
+  const companyLabel = statCompany === 'all' ? '' : ` · ${statCompany}`;
+  document.getElementById('rangeLabel').textContent = `${from} → ${to}${companyLabel}`;
   
-  // 过滤范围内的表单
-  const inRange = all.filter(f => f.date >= from && f.date <= to);
+  // 过滤范围内的表单 + 公司过滤
+  let inRange = all.filter(f => f.date >= from && f.date <= to);
+  if (statCompany !== 'all') {
+    inRange = inRange.filter(f => (f.company || '') === statCompany);
+  }
   
   // 计算总金额和件数
   let totalAmount = 0, totalQty = 0;
@@ -1869,6 +2038,16 @@ async function renderStats() {
   } else if (statMode === 'techs') {
     inRange.forEach(f => {
       const key = (f.tech || '(无技术员)').trim();
+      if (!stats[key]) stats[key] = { name: key, qty: 0, forms: 0, amount: 0 };
+      stats[key].forms += 1;
+      f.items.forEach(it => {
+        stats[key].qty += it.qty || 0;
+        stats[key].amount += (it.qty || 0) * (it.price || 0);
+      });
+    });
+  } else if (statMode === 'companies') {
+    inRange.forEach(f => {
+      const key = (f.company || '(无公司)').trim();
       if (!stats[key]) stats[key] = { name: key, qty: 0, forms: 0, amount: 0 };
       stats[key].forms += 1;
       f.items.forEach(it => {
@@ -1976,11 +2155,13 @@ async function renderSettings() {
   `;
 }
 
+let currentPriceCompany = 'OBC';
+
 async function renderPriceList() {
-  const prices = await Data.getAllPrices();
+  const prices = await Data.getAllPrices(currentPriceCompany);
   const container = document.getElementById('priceList');
   if (prices.length === 0) {
-    container.innerHTML = '<div style="font-size: 12px; color: var(--text-3); padding: 8px; text-align: center;">还没有价格记录</div>';
+    container.innerHTML = `<div style="font-size: 12px; color: var(--text-3); padding: 8px; text-align: center;">${currentPriceCompany} 还没有价格记录</div>`;
     return;
   }
   container.innerHTML = prices.map(p => `
@@ -1996,7 +2177,7 @@ async function renderPriceList() {
       const name = input.dataset.name;
       const price = parseFloat(input.value) || 0;
       if (price > 0) {
-        await Data.setPrice(name, price);
+        await Data.setPrice(currentPriceCompany, name, price);
         showToast('✓ 已更新');
       }
     });
@@ -2004,19 +2185,29 @@ async function renderPriceList() {
   
   container.querySelectorAll('.price-del').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm(`删除 "${btn.dataset.name}" 的价格?`)) return;
-      await Data.deletePrice(btn.dataset.name);
+      if (!confirm(`删除 ${currentPriceCompany} 的 "${btn.dataset.name}" 价格?`)) return;
+      await Data.deletePrice(currentPriceCompany, btn.dataset.name);
       await renderPriceList();
       showToast('已删除');
     });
   });
 }
 
+// 价格管理: 公司切换
+document.querySelectorAll('[data-pricecompany]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('[data-pricecompany]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentPriceCompany = btn.dataset.pricecompany;
+    await renderPriceList();
+  });
+});
+
 document.getElementById('addPriceBtn').addEventListener('click', async () => {
   const name = document.getElementById('newPriceName').value.trim();
   const price = parseFloat(document.getElementById('newPriceValue').value) || 0;
   if (!name || price <= 0) { showToast('请填写物料名和价格'); return; }
-  await Data.setPrice(name, price);
+  await Data.setPrice(currentPriceCompany, name, price);
   document.getElementById('newPriceName').value = '';
   document.getElementById('newPriceValue').value = '';
   await renderPriceList();
@@ -2043,13 +2234,13 @@ document.getElementById('exportCsv').addEventListener('click', async () => {
   if (all.length === 0) { showToast('暂无数据'); return; }
   
   // CSV: each item is a row
-  const headers = ['Date', 'Ref No', 'Technician', 'Customer', 'Model', 'Part', 'Qty', 'Price', 'Subtotal'];
+  const headers = ['Date', 'Company', 'Ref No', 'Technician', 'Customer', 'Model', 'Part', 'Qty', 'Price', 'Subtotal'];
   const rows = [];
   all.forEach(f => {
     f.items.forEach(it => {
       const price = it.price || 0;
       const subtotal = (it.qty || 0) * price;
-      rows.push([f.date, f.refNo || '', f.tech || '', f.customer || '', f.model || '', it.name, it.qty, price.toFixed(2), subtotal.toFixed(2)]);
+      rows.push([f.date, f.company || '', f.refNo || '', f.tech || '', f.customer || '', f.model || '', it.name, it.qty, price.toFixed(2), subtotal.toFixed(2)]);
     });
   });
   
