@@ -806,11 +806,12 @@
   <!-- SETTINGS TAB -->
   <section id="tab-settings" class="tab-content hidden">
     <div class="card">
-      <div class="card-title">🔑 OCR API</div>
-      <label class="field-label">Google Cloud Vision API Key</label>
+      <div class="card-title">🔑 Gemini AI</div>
+      <label class="field-label">Gemini API Key</label>
       <input type="password" id="apiKeyInput" placeholder="AIza...">
       <div style="font-size: 11px; color: var(--text-3); margin-top: 8px; line-height: 1.5;">
-        Google Cloud Console → 启用 Vision API → 创建 API Key。每月 1000 次免费,自用足够。仅存于本地浏览器。
+        前往 <span style="color: var(--accent);">aistudio.google.com/apikey</span> 创建免费 API Key。
+        每天 1500 次免费,自用绰绰有余。Gemini AI 比传统 OCR 更聪明,能读懂手写表格的结构。
       </div>
       <button class="btn" id="saveApiKey" style="margin-top: 12px;">保存 API Key</button>
     </div>
@@ -1003,7 +1004,7 @@ function normalizePart(name) {
   return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-// ============== OCR ==============
+// ============== OCR (Gemini AI Vision) ==============
 async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -1013,21 +1014,76 @@ async function fileToBase64(file) {
   });
 }
 
+// 压缩图片到合理大小,加快上传 + 减少 token 消耗
+async function compressImage(file, maxWidth = 1600, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxWidth / img.width);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(b => resolve(b), 'image/jpeg', quality);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 async function ocrImage(file) {
   const apiKey = await Data.getSetting('apiKey');
-  if (!apiKey) throw new Error('请先到「设置」填入 Google Cloud Vision API Key');
+  if (!apiKey) throw new Error('请先到「设置」填入 Gemini API Key');
   
-  const base64 = await fileToBase64(file);
+  // 压缩图片
+  const compressed = await compressImage(file).catch(() => file);
+  const base64 = await fileToBase64(compressed);
+  
+  const prompt = `You are reading a "Sparepart Requisition Form" filled by a service technician. The form may be handwritten and messy.
+
+Extract the following and return ONLY valid JSON (no markdown, no explanation):
+
+{
+  "date": "YYYY-MM-DD or empty string",
+  "refNo": "reference number or empty",
+  "tech": "technician/requestor name (look for REQUESTOR NAME field) or empty",
+  "customer": "customer name (most common one in CUSTOMER NAME column) or empty",
+  "model": "machine model like MPC 3004, MP 3555, IM C2000, or empty",
+  "items": [
+    {"name": "PART NAME IN UPPERCASE", "qty": number}
+  ]
+}
+
+Rules:
+- Read all rows in DESCRIPTION column (BOTH the consumable section AND the TONER section)
+- For QTY, read the number in the QTY column on each row
+- Common parts: DRUM, TONER C/M/Y/K, CHARGER ROLLER, PICK UP ROLLER, ADF BELT UNIT, FUSER, DEVELOPER, CLEANING BLADE, SLEEVE FILM, ELEMENT BAR, PCCB, CB
+- Standardize part names to UPPERCASE
+- If handwriting is unclear, give your best interpretation based on context
+- Convert dates from DD/MM/YYYY to YYYY-MM-DD
+- Skip empty rows
+- Return ONLY the JSON object, nothing else, no markdown fences`;
+  
   const body = {
-    requests: [{
-      image: { content: base64 },
-      features: [
-        { type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }
+    contents: [{
+      parts: [
+        { text: prompt },
+        { inline_data: { mime_type: 'image/jpeg', data: base64 } }
       ]
-    }]
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 2048,
+      responseMimeType: 'application/json'
+    }
   };
   
-  const res = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -1035,141 +1091,52 @@ async function ocrImage(file) {
   
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || '识别失败,检查 API Key 和网络');
+    throw new Error(err.error?.message || `识别失败 (${res.status}),检查 API Key 是否正确`);
   }
   
   const data = await res.json();
-  return data.responses[0]?.fullTextAnnotation?.text || '';
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return text;
 }
 
-// Parse spare-part form text into structured data
+// Gemini 直接返回 JSON,这里只需简单解析
 async function parseFormText(text) {
   const result = { date: '', refNo: '', customer: '', model: '', tech: '', items: [] };
   if (!text) return result;
   
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  
-  // Ref No: usually 3-5 digits after "REF NO" or standalone
-  const refMatch = text.match(/REF\s*NO[:\s]*(\d{3,6})/i);
-  if (refMatch) result.refNo = refMatch[1];
-  
-  // Date: DD/MM/YYYY or D/M/YYYY
-  const dateMatch = text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-  if (dateMatch) {
-    let [, d, m, y] = dateMatch;
-    if (y.length === 2) y = '20' + y;
-    if (parseInt(m) > 12 && parseInt(d) <= 12) [d, m] = [m, d]; // swap if seems wrong
-    result.date = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  }
-  
-  // Model: try to find e.g. "MPC 3004", "MP C3004", "IM C2000", "IM C3000"
-  const modelMatch = text.match(/\b(M\s?P\s?C|IM\s?C|MP|IM)\s*(\d{3,5})\b/i);
-  if (modelMatch) result.model = modelMatch[0].replace(/\s+/g, ' ').toUpperCase().replace(/\s/g, ' ').trim();
-  
-  // Customer: hard to parse without anchors; try to find name after "CUSTOMER NAME"
-  const custMatch = text.match(/CUSTOMER\s*NAME[\s:]*([^\n\r]+)/i);
-  if (custMatch) {
-    let c = custMatch[1].trim().split(/\s{2,}/)[0].slice(0, 40);
-    // 排除明显是表头/无效内容的情况
-    if (c.length > 1 && c.length < 40 && 
-        !/RECEIVED|RETURN|PART|TECH|SIGN|REMARK|QTY|MODEL|EDP|CODE|DESCRIPTION/i.test(c)) {
-      result.customer = c.replace(/[|*#=_]/g, '').trim();
+  try {
+    let clean = text.trim();
+    // 去除可能的 markdown 包裹
+    if (clean.startsWith('```')) {
+      clean = clean.replace(/^```(?:json)?\s*/, '').replace(/```\s*$/, '');
     }
-  }
-  
-  // Technician: 多种模式识别
-  // 模式 1: "REQUESTOR NAME: SAIFU" 同一行
-  let techMatch = text.match(/(?:REQUESTOR|TECHNICIAN|TECH)\s*NAME[\s:]*([A-Za-z][A-Za-z\s'.\-]{0,28})(?:\s*REF|\s*DATE|\s*$|\n)/i);
-  if (techMatch && techMatch[1]) {
-    let t = techMatch[1].trim().split(/\s{2,}/)[0].slice(0, 30);
-    t = t.replace(/REF\s*NO.*$/i, '').replace(/DATE.*$/i, '').trim();
-    if (t.length > 1) result.tech = t;
-  }
-  
-  // 模式 2: 跨行模式 - "REQUESTOR NAME:" 在一行,名字在下一行
-  if (!result.tech) {
-    for (let i = 0; i < lines.length; i++) {
-      if (/(?:REQUESTOR|TECHNICIAN|TECH)\s*NAME[\s:]*$/i.test(lines[i]) && lines[i+1]) {
-        const next = lines[i+1].trim();
-        if (next.length > 1 && next.length < 30 && /^[A-Za-z]/.test(next) && !/REF|DATE|CUSTOMER/i.test(next)) {
-          result.tech = next.replace(/[:_].*$/, '').trim();
-          break;
-        }
-      }
-    }
-  }
-  
-  // 模式 3: "NAME: SAIFU" 单独一行(表底常见)
-  if (!result.tech) {
-    for (const line of lines) {
-      const m = line.match(/^NAME[\s:]+([A-Za-z][A-Za-z\s'.\-]{1,28})$/i);
-      if (m) {
-        const cand = m[1].trim();
-        // 排除 customer name 等
-        if (!/customer|date|ref/i.test(cand)) {
-          result.tech = cand;
-          break;
-        }
-      }
-    }
-  }
-  
-  // 清理识别到的名字: 去掉常见垃圾字符
-  if (result.tech) {
-    result.tech = result.tech.replace(/[|*#=_\\\/]/g, '').trim();
-    if (result.tech.length < 2) result.tech = '';
-  }
-  
-  // Items: look for known part keywords
-  const partKeywords = [
-    'drum', 'toner', 'roller', 'belt', 'fuser', 'cleaning', 'blade', 
-    'developer', 'transfer', 'pickup', 'pick up', 'pick-up', 'charger',
-    'adf', 'feed', 'separation', 'magnet', 'screw', 'gear', 'bushing',
-    'lamp', 'sensor', 'cartridge', 'unit', 'kit', 'cleaner',
-    'film', 'filter', 'sleeve', 'guide', 'staple', 'waste', 'ink',
-    'maintenance', 'photoconductor', 'opc', 'pcu'
-  ];
-  
-  // Heuristic: scan lines for part keywords + nearby quantity
-  const seenParts = new Set();
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lower = line.toLowerCase();
     
-    if (partKeywords.some(k => lower.includes(k))) {
-      // Try to find a number 1-9 in same line or nearby line as qty
-      let qty = 1;
-      const qtyMatch = line.match(/\b([1-9]|10)\b/);
-      if (qtyMatch) qty = parseInt(qtyMatch[1]);
-      
-      // Clean part name (remove qty, special chars)
-      let partName = line
-        .replace(/\b\d+\b/g, '')
-        .replace(/[|*#=]/g, '')
-        .replace(/MPC?\s*\d+/gi, '')
-        .replace(/IM\s*C?\s*\d+/gi, '')
-        .trim();
-      
-      // Heuristic: handle Toner C / Toner M / Toner Y / Toner K
-      const tonerMatch = partName.match(/toner\s*[CMYK]\b/i);
-      if (tonerMatch) partName = tonerMatch[0].toUpperCase();
-      
-      const norm = normalizePart(partName);
-      if (norm && norm.length >= 3 && norm.length <= 50 && !seenParts.has(norm)) {
-        seenParts.add(norm);
-        result.items.push({ name: partName.slice(0, 50), qty });
+    const parsed = JSON.parse(clean);
+    
+    if (parsed.date) result.date = String(parsed.date).trim();
+    if (parsed.refNo) result.refNo = String(parsed.refNo).trim();
+    if (parsed.tech) result.tech = String(parsed.tech).trim();
+    if (parsed.customer) result.customer = String(parsed.customer).trim();
+    if (parsed.model) result.model = String(parsed.model).trim().toUpperCase();
+    
+    if (Array.isArray(parsed.items)) {
+      const seen = new Set();
+      for (const it of parsed.items) {
+        if (!it || !it.name) continue;
+        const name = String(it.name).trim();
+        const qty = parseInt(it.qty) || 1;
+        const norm = normalizePart(name);
+        if (!norm || seen.has(norm)) continue;
+        seen.add(norm);
+        result.items.push({ name, qty });
       }
     }
+  } catch (e) {
+    console.error('Parse JSON failed:', e, text);
+    // JSON 解析失败,保留空结果
   }
   
-  // If no items detected, try another pass: lines with just "<word> <number>" pattern
-  if (result.items.length === 0) {
-    for (const line of lines) {
-      const m = line.match(/^([A-Za-z][A-Za-z\s\-]{2,30})\s+([1-9]|10)\s*$/);
-      if (m) result.items.push({ name: m[1].trim(), qty: parseInt(m[2]) });
-    }
-  }
-  
+  return result;
   return result;
 }
 
