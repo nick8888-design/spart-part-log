@@ -221,7 +221,33 @@
   .upload-zone .icon { font-size: 28px; margin-bottom: 6px; }
   .upload-zone .text { font-weight: 500; }
   .upload-zone .hint { font-size: 11px; color: var(--text-3); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+  
+  /* Two-button upload (Camera + Gallery) */
+  .upload-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .upload-btn {
+    display: block;
+    text-align: center;
+    padding: 22px 12px;
+    background: var(--bg);
+    border: 2px dashed var(--line);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .upload-btn:hover, .upload-btn:active {
+    border-color: var(--accent);
+    background: rgba(78, 205, 196, 0.08);
+  }
+  .upload-btn .icon { font-size: 32px; margin-bottom: 6px; }
+  .upload-btn .text { font-weight: 600; font-size: 15px; letter-spacing: 0.05em; }
+  .upload-btn .hint { font-size: 10px; color: var(--text-3); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+  
   #fileInput, #importFile { display: none; }
+  #cameraInput, #galleryInput { display: none; }
 
   /* Item rows */
   .item-row {
@@ -567,12 +593,20 @@
   <section id="tab-add" class="tab-content">
     <div class="card">
       <div class="card-title">📷 扫描表单（可选）</div>
-      <label for="fileInput" class="upload-zone" id="uploadZone">
-        <div class="icon">📄</div>
-        <div class="text">点击拍照或选择图片</div>
-        <div class="hint">系统会自动填入下方表单 · 你可修改</div>
-      </label>
-      <input type="file" id="fileInput" accept="image/*" capture="environment">
+      <div class="upload-buttons">
+        <label for="cameraInput" class="upload-btn">
+          <div class="icon">📸</div>
+          <div class="text">拍 照</div>
+          <div class="hint">现场拍新表</div>
+        </label>
+        <label for="galleryInput" class="upload-btn">
+          <div class="icon">🖼️</div>
+          <div class="text">相 册</div>
+          <div class="hint">从手机选已有照片</div>
+        </label>
+      </div>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment">
+      <input type="file" id="galleryInput" accept="image/*">
       <div id="ocrStatus"></div>
       <img id="previewImg" class="preview-img hidden" />
     </div>
@@ -587,6 +621,14 @@
         <div>
           <label class="field-label">Ref No</label>
           <input type="text" id="inRefNo" placeholder="1233">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label class="field-label">技术员 Technician</label>
+        <div class="input-wrap">
+          <input type="text" id="inTech" placeholder="如:SAIFU" autocomplete="off">
+          <div class="suggestions" id="techSuggestions"></div>
         </div>
       </div>
       
@@ -652,6 +694,7 @@
         <button class="stat-tab active" data-stat="parts">按物料</button>
         <button class="stat-tab" data-stat="customers">按客户</button>
         <button class="stat-tab" data-stat="models">按型号</button>
+        <button class="stat-tab" data-stat="techs">按技术员</button>
       </div>
 
       <div id="statsList"></div>
@@ -902,7 +945,7 @@ async function ocrImage(file) {
 
 // Parse spare-part form text into structured data
 async function parseFormText(text) {
-  const result = { date: '', refNo: '', customer: '', model: '', items: [] };
+  const result = { date: '', refNo: '', customer: '', model: '', tech: '', items: [] };
   if (!text) return result;
   
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
@@ -928,7 +971,54 @@ async function parseFormText(text) {
   const custMatch = text.match(/CUSTOMER\s*NAME[\s:]*([^\n\r]+)/i);
   if (custMatch) {
     let c = custMatch[1].trim().split(/\s{2,}/)[0].slice(0, 40);
-    if (c.length > 1 && c.length < 40) result.customer = c;
+    // 排除明显是表头/无效内容的情况
+    if (c.length > 1 && c.length < 40 && 
+        !/RECEIVED|RETURN|PART|TECH|SIGN|REMARK|QTY|MODEL|EDP|CODE|DESCRIPTION/i.test(c)) {
+      result.customer = c.replace(/[|*#=_]/g, '').trim();
+    }
+  }
+  
+  // Technician: 多种模式识别
+  // 模式 1: "REQUESTOR NAME: SAIFU" 同一行
+  let techMatch = text.match(/(?:REQUESTOR|TECHNICIAN|TECH)\s*NAME[\s:]*([A-Za-z][A-Za-z\s'.\-]{0,28})(?:\s*REF|\s*DATE|\s*$|\n)/i);
+  if (techMatch && techMatch[1]) {
+    let t = techMatch[1].trim().split(/\s{2,}/)[0].slice(0, 30);
+    t = t.replace(/REF\s*NO.*$/i, '').replace(/DATE.*$/i, '').trim();
+    if (t.length > 1) result.tech = t;
+  }
+  
+  // 模式 2: 跨行模式 - "REQUESTOR NAME:" 在一行,名字在下一行
+  if (!result.tech) {
+    for (let i = 0; i < lines.length; i++) {
+      if (/(?:REQUESTOR|TECHNICIAN|TECH)\s*NAME[\s:]*$/i.test(lines[i]) && lines[i+1]) {
+        const next = lines[i+1].trim();
+        if (next.length > 1 && next.length < 30 && /^[A-Za-z]/.test(next) && !/REF|DATE|CUSTOMER/i.test(next)) {
+          result.tech = next.replace(/[:_].*$/, '').trim();
+          break;
+        }
+      }
+    }
+  }
+  
+  // 模式 3: "NAME: SAIFU" 单独一行(表底常见)
+  if (!result.tech) {
+    for (const line of lines) {
+      const m = line.match(/^NAME[\s:]+([A-Za-z][A-Za-z\s'.\-]{1,28})$/i);
+      if (m) {
+        const cand = m[1].trim();
+        // 排除 customer name 等
+        if (!/customer|date|ref/i.test(cand)) {
+          result.tech = cand;
+          break;
+        }
+      }
+    }
+  }
+  
+  // 清理识别到的名字: 去掉常见垃圾字符
+  if (result.tech) {
+    result.tech = result.tech.replace(/[|*#=_\\\/]/g, '').trim();
+    if (result.tech.length < 2) result.tech = '';
   }
   
   // Items: look for known part keywords
@@ -936,7 +1026,9 @@ async function parseFormText(text) {
     'drum', 'toner', 'roller', 'belt', 'fuser', 'cleaning', 'blade', 
     'developer', 'transfer', 'pickup', 'pick up', 'pick-up', 'charger',
     'adf', 'feed', 'separation', 'magnet', 'screw', 'gear', 'bushing',
-    'lamp', 'sensor', 'cartridge', 'unit', 'kit', 'cleaner'
+    'lamp', 'sensor', 'cartridge', 'unit', 'kit', 'cleaner',
+    'film', 'filter', 'sleeve', 'guide', 'staple', 'waste', 'ink',
+    'maintenance', 'photoconductor', 'opc', 'pcu'
   ];
   
   // Heuristic: scan lines for part keywords + nearby quantity
@@ -1078,16 +1170,17 @@ async function setupAutocomplete(input, sugBox, type) {
 }
 
 // Setup main inputs
+setupAutocomplete(document.getElementById('inTech'), document.getElementById('techSuggestions'), 'tech');
 setupAutocomplete(document.getElementById('inCustomer'), document.getElementById('customerSuggestions'), 'customer');
 setupAutocomplete(document.getElementById('inModel'), document.getElementById('modelSuggestions'), 'model');
 
 // ============== ADD: OCR ==============
-const fileInput = document.getElementById('fileInput');
+const cameraInput = document.getElementById('cameraInput');
+const galleryInput = document.getElementById('galleryInput');
 const ocrStatus = document.getElementById('ocrStatus');
 const previewImg = document.getElementById('previewImg');
 
-fileInput.addEventListener('change', async (e) => {
-  const file = e.target.files[0];
+async function handleImageFile(file) {
   if (!file) return;
   
   const url = URL.createObjectURL(file);
@@ -1103,6 +1196,7 @@ fileInput.addEventListener('change', async (e) => {
     
     if (parsed.date) document.getElementById('inDate').value = parsed.date;
     if (parsed.refNo) document.getElementById('inRefNo').value = parsed.refNo;
+    if (parsed.tech) document.getElementById('inTech').value = parsed.tech;
     if (parsed.customer) document.getElementById('inCustomer').value = parsed.customer;
     if (parsed.model) document.getElementById('inModel').value = parsed.model;
     
@@ -1117,12 +1211,16 @@ fileInput.addEventListener('change', async (e) => {
     ocrStatus.className = 'ocr-status error';
     ocrStatus.innerHTML = '✗ ' + err.message;
   }
-});
+}
+
+cameraInput.addEventListener('change', (e) => handleImageFile(e.target.files[0]));
+galleryInput.addEventListener('change', (e) => handleImageFile(e.target.files[0]));
 
 // ============== ADD: Save ==============
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const date = document.getElementById('inDate').value;
   const refNo = document.getElementById('inRefNo').value.trim();
+  const tech = document.getElementById('inTech').value.trim();
   const customer = document.getElementById('inCustomer').value.trim();
   const model = document.getElementById('inModel').value.trim();
   const items = getItems();
@@ -1132,7 +1230,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   
   const isEditing = document.getElementById('saveBtn').dataset.editId;
   const formData = {
-    date, refNo, customer, model, items,
+    date, refNo, tech, customer, model, items,
     createdAt: Date.now()
   };
   
@@ -1148,20 +1246,28 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   }
   
   // Update dictionaries
+  if (tech) await Data.bumpDict('tech', tech);
   if (customer) await Data.bumpDict('customer', customer);
   if (model) await Data.bumpDict('model', model);
   for (const it of items) await Data.bumpDict('part', it.name);
+  
+  // 自动保存技术员名(如果设置里没有)
+  if (tech && !(await Data.getSetting('techName'))) {
+    await Data.setSetting('techName', tech);
+  }
   
   // Reset
   document.getElementById('inRefNo').value = '';
   document.getElementById('inCustomer').value = '';
   document.getElementById('inModel').value = '';
   document.getElementById('inDate').value = todayStr();
+  // 技术员名字保留(每次都是同一个人,不清空)
   clearItemRows();
   addItemRow();
   previewImg.classList.add('hidden');
   ocrStatus.innerHTML = '';
-  fileInput.value = '';
+  cameraInput.value = '';
+  galleryInput.value = '';
   
   switchTab('logs');
 });
@@ -1196,7 +1302,7 @@ async function renderLogs() {
     <div class="log-entry" data-id="${f.id}">
       <div class="head">
         <div>
-          <div class="ref">${f.refNo ? '#' + escapeHtml(f.refNo) : ''}</div>
+          <div class="ref">${f.refNo ? '#' + escapeHtml(f.refNo) : ''}${f.tech ? (f.refNo ? ' · ' : '') + '👤 ' + escapeHtml(f.tech) : ''}</div>
           <div class="customer">${escapeHtml(f.customer || '(无客户名)')}</div>
         </div>
         ${f.model ? `<div class="model">${escapeHtml(f.model)}</div>` : ''}
@@ -1227,7 +1333,7 @@ async function openDetail(id) {
   const totalQty = f.items.reduce((s, it) => s + (it.qty || 0), 0);
   
   document.getElementById('detailContent').innerHTML = `
-    <div style="font-size: 13px; color: var(--text-3); margin-bottom: 4px;">${f.refNo ? 'Ref #' + escapeHtml(f.refNo) + ' · ' : ''}${f.date}</div>
+    <div style="font-size: 13px; color: var(--text-3); margin-bottom: 4px;">${f.refNo ? 'Ref #' + escapeHtml(f.refNo) + ' · ' : ''}${f.date}${f.tech ? ' · 👤 ' + escapeHtml(f.tech) : ''}</div>
     <div style="font-size: 18px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(f.customer || '(无客户)')}</div>
     ${f.model ? `<div style="display: inline-block; background: var(--bg-3); color: var(--accent); padding: 4px 10px; border-radius: 5px; font-size: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 600; margin-bottom: 14px;">${escapeHtml(f.model)}</div>` : ''}
     
@@ -1257,6 +1363,7 @@ document.getElementById('editForm').addEventListener('click', async () => {
   
   document.getElementById('inDate').value = f.date;
   document.getElementById('inRefNo').value = f.refNo || '';
+  document.getElementById('inTech').value = f.tech || '';
   document.getElementById('inCustomer').value = f.customer || '';
   document.getElementById('inModel').value = f.model || '';
   clearItemRows();
@@ -1333,6 +1440,13 @@ async function renderStats() {
       stats[key].qty += f.items.reduce((s, it) => s + it.qty, 0);
       stats[key].forms += 1;
     });
+  } else if (statMode === 'techs') {
+    monthForms.forEach(f => {
+      const key = (f.tech || '(无技术员)').trim();
+      if (!stats[key]) stats[key] = { name: key, qty: 0, forms: 0 };
+      stats[key].qty += f.items.reduce((s, it) => s + it.qty, 0);
+      stats[key].forms += 1;
+    });
   }
   
   const arr = Object.values(stats).sort((a, b) => b.qty - a.qty);
@@ -1399,10 +1513,12 @@ async function renderSettings() {
   const parts = await Data.getDict('part');
   const customers = await Data.getDict('customer');
   const models = await Data.getDict('model');
+  const techs = await Data.getDict('tech');
   document.getElementById('dictStats').innerHTML = `
     📦 物料类型 ${parts.length} 种<br>
     🏢 客户 ${customers.length} 个<br>
-    🖨 型号 ${models.length} 个
+    🖨 型号 ${models.length} 个<br>
+    👤 技术员 ${techs.length} 人
   `;
 }
 
@@ -1422,11 +1538,11 @@ document.getElementById('exportCsv').addEventListener('click', async () => {
   if (all.length === 0) { showToast('暂无数据'); return; }
   
   // CSV: each item is a row
-  const headers = ['Date', 'Ref No', 'Customer', 'Model', 'Part', 'Qty'];
+  const headers = ['Date', 'Ref No', 'Technician', 'Customer', 'Model', 'Part', 'Qty'];
   const rows = [];
   all.forEach(f => {
     f.items.forEach(it => {
-      rows.push([f.date, f.refNo || '', f.customer || '', f.model || '', it.name, it.qty]);
+      rows.push([f.date, f.refNo || '', f.tech || '', f.customer || '', f.model || '', it.name, it.qty]);
     });
   });
   
@@ -1445,10 +1561,11 @@ document.getElementById('exportJson').addEventListener('click', async () => {
   const dictParts = await Data.getDict('part');
   const dictCustomers = await Data.getDict('customer');
   const dictModels = await Data.getDict('model');
+  const dictTechs = await Data.getDict('tech');
   const blob = new Blob([JSON.stringify({
     exportedAt: new Date().toISOString(),
     forms: all,
-    dict: { parts: dictParts, customers: dictCustomers, models: dictModels }
+    dict: { parts: dictParts, customers: dictCustomers, models: dictModels, techs: dictTechs }
   }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1475,6 +1592,7 @@ document.getElementById('importFile').addEventListener('change', async (e) => {
       for (const p of (data.dict.parts || [])) await Data.bumpDict('part', p.name);
       for (const c of (data.dict.customers || [])) await Data.bumpDict('customer', c.name);
       for (const m of (data.dict.models || [])) await Data.bumpDict('model', m.name);
+      for (const t of (data.dict.techs || [])) await Data.bumpDict('tech', t.name);
     }
     showToast(`✓ 已导入 ${count} 张表`);
     renderSettings();
@@ -1495,6 +1613,9 @@ document.getElementById('clearData').addEventListener('click', async () => {
 (async () => {
   await openDB();
   document.getElementById('inDate').value = todayStr();
+  // 自动填入设置里的技术员名字
+  const savedTech = await Data.getSetting('techName');
+  if (savedTech) document.getElementById('inTech').value = savedTech;
   addItemRow();
   
   // Register service worker (sw.js needs to be in the same folder)
