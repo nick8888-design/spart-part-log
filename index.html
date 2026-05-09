@@ -222,6 +222,96 @@
   .upload-zone .text { font-weight: 500; }
   .upload-zone .hint { font-size: 11px; color: var(--text-3); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
   
+  /* Quick buttons (techs/customers/models) */
+  .quick-techs, .quick-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .quick-techs:empty, .quick-chips:empty { display: none; }
+  
+  .quick-tech-btn, .quick-chip {
+    background: var(--bg-3);
+    color: var(--text);
+    border: 1px solid var(--line);
+    padding: 8px 14px;
+    border-radius: 18px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .quick-tech-btn:hover, .quick-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .quick-tech-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .quick-chip {
+    padding: 5px 11px;
+    font-size: 12px;
+    border-radius: 14px;
+  }
+  .quick-chip.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .quick-chip .count {
+    font-size: 10px;
+    opacity: 0.6;
+    margin-left: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  /* Quick parts section (most-used parts) */
+  .quick-parts-section {
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--line-soft);
+  }
+  .quick-parts-section:has(.quick-parts:empty) { display: none; }
+  .quick-parts-label {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: 0.05em;
+  }
+  .quick-parts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .quick-part-btn {
+    background: var(--bg-3);
+    color: var(--text);
+    border: 1px solid var(--line);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.02em;
+  }
+  .quick-part-btn:hover, .quick-part-btn:active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    transform: scale(0.97);
+  }
+  
   /* Two-button upload (Camera + Gallery) */
   .upload-buttons {
     display: grid;
@@ -626,24 +716,27 @@
       
       <div class="form-group">
         <label class="field-label">技术员 Technician</label>
+        <div class="quick-techs" id="quickTechs"></div>
         <div class="input-wrap">
-          <input type="text" id="inTech" placeholder="如:SAIFU" autocomplete="off">
+          <input type="text" id="inTech" placeholder="点上方按钮快速选择,或手动输入" autocomplete="off">
           <div class="suggestions" id="techSuggestions"></div>
         </div>
       </div>
       
       <div class="form-group">
         <label class="field-label">客户名 Customer</label>
+        <div class="quick-chips" id="quickCustomers"></div>
         <div class="input-wrap">
-          <input type="text" id="inCustomer" placeholder="如:Hey Stationery" autocomplete="off">
+          <input type="text" id="inCustomer" placeholder="点上方常用客户,或手动输入" autocomplete="off">
           <div class="suggestions" id="customerSuggestions"></div>
         </div>
       </div>
       
       <div class="form-group">
         <label class="field-label">机器型号 Model</label>
+        <div class="quick-chips" id="quickModels"></div>
         <div class="input-wrap">
-          <input type="text" id="inModel" placeholder="如:MPC 3004" autocomplete="off">
+          <input type="text" id="inModel" placeholder="点上方常用型号,或手动输入" autocomplete="off">
           <div class="suggestions" id="modelSuggestions"></div>
         </div>
       </div>
@@ -651,8 +744,12 @@
 
     <div class="card">
       <div class="card-title">🔧 物料清单 Items</div>
+      <div class="quick-parts-section">
+        <div class="quick-parts-label">⚡ 快捷添加（点一下加 1 件）</div>
+        <div class="quick-parts" id="quickParts"></div>
+      </div>
       <div id="itemsContainer"></div>
-      <button class="add-item-btn" id="addItemBtn">+ 添加物料</button>
+      <button class="add-item-btn" id="addItemBtn">+ 手动添加物料</button>
     </div>
 
     <button class="btn" id="saveBtn" style="width:100%; padding: 16px; font-size: 15px;">💾 保 存 这 张 表</button>
@@ -719,10 +816,12 @@
     </div>
 
     <div class="card">
-      <div class="card-title">👤 我的信息</div>
-      <label class="field-label">技术员名字（自动填入新表单）</label>
-      <input type="text" id="techNameInput" placeholder="SAIFU">
-      <button class="btn" id="saveTechName" style="margin-top: 12px;">保存</button>
+      <div class="card-title">👥 技术员名单</div>
+      <div style="font-size: 12px; color: var(--text-2); margin-bottom: 10px;">
+        管理"新增"页的快捷按钮。每行一个名字,点保存生效。
+      </div>
+      <textarea id="techListInput" rows="5" placeholder="Saiful&#10;Syafiq&#10;Ibrahim" style="font-family: 'JetBrains Mono', monospace; resize: vertical;"></textarea>
+      <button class="btn" id="saveTechList" style="margin-top: 12px;">保存名单</button>
     </div>
 
     <div class="card">
@@ -1082,6 +1181,7 @@ document.querySelectorAll('.tab').forEach(btn => {
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('hidden', c.id !== `tab-${name}`));
+  if (name === 'add') refreshQuickButtons();
   if (name === 'logs') renderLogs();
   if (name === 'stats') renderStats();
   if (name === 'settings') renderSettings();
@@ -1174,6 +1274,110 @@ setupAutocomplete(document.getElementById('inTech'), document.getElementById('te
 setupAutocomplete(document.getElementById('inCustomer'), document.getElementById('customerSuggestions'), 'customer');
 setupAutocomplete(document.getElementById('inModel'), document.getElementById('modelSuggestions'), 'model');
 
+// ============== QUICK BUTTONS ==============
+
+// 预设技术员名字(可在设置里改)
+const DEFAULT_TECHS = ['Saiful', 'Syafiq', 'Ibrahim'];
+
+// 渲染技术员快捷按钮
+async function renderQuickTechs() {
+  const container = document.getElementById('quickTechs');
+  // 先获取设置里保存的技术员列表(若有),否则用预设
+  let techs = await Data.getSetting('techList');
+  if (!techs || !Array.isArray(techs) || techs.length === 0) {
+    techs = DEFAULT_TECHS;
+    await Data.setSetting('techList', techs);
+  }
+  
+  const currentValue = document.getElementById('inTech').value.trim().toLowerCase();
+  container.innerHTML = techs.map(t => 
+    `<button class="quick-tech-btn ${t.toLowerCase() === currentValue ? 'active' : ''}" data-name="${escapeHtml(t)}">${escapeHtml(t)}</button>`
+  ).join('');
+  
+  container.querySelectorAll('.quick-tech-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('inTech').value = btn.dataset.name;
+      // 更新 active 状态
+      container.querySelectorAll('.quick-tech-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+}
+
+// 渲染最常用客户/型号 chips (按使用频率,Top 8)
+async function renderQuickChips(type, containerId, inputId, max = 8) {
+  const container = document.getElementById(containerId);
+  const items = await Data.getDict(type);
+  const top = items.slice(0, max);
+  
+  if (top.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  const currentValue = document.getElementById(inputId).value.trim().toLowerCase();
+  container.innerHTML = top.map(item => 
+    `<button class="quick-chip ${item.name.toLowerCase() === currentValue ? 'active' : ''}" data-name="${escapeHtml(item.name)}">${escapeHtml(item.name)}<span class="count">×${item.count}</span></button>`
+  ).join('');
+  
+  container.querySelectorAll('.quick-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById(inputId).value = btn.dataset.name;
+      container.querySelectorAll('.quick-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+}
+
+// 渲染最常用物料快捷按钮 (Top 12)
+async function renderQuickParts() {
+  const container = document.getElementById('quickParts');
+  const parts = await Data.getDict('part');
+  const top = parts.slice(0, 12);
+  
+  if (top.length === 0) {
+    container.innerHTML = '<div style="font-size: 11px; color: var(--text-3); padding: 4px;">输入过的物料会出现在这里,用得越多越方便</div>';
+    return;
+  }
+  
+  container.innerHTML = top.map(p => 
+    `<button class="quick-part-btn" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}</button>`
+  ).join('');
+  
+  container.querySelectorAll('.quick-part-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      // 检查是否已存在,有则数量+1
+      const name = btn.dataset.name;
+      const rows = [...itemsContainer.querySelectorAll('.item-row')];
+      const existing = rows.find(r => r.querySelector('.item-name').value.trim() === name);
+      if (existing) {
+        const qtyInput = existing.querySelector('.item-qty');
+        qtyInput.value = (parseInt(qtyInput.value) || 0) + 1;
+      } else {
+        // 找空行复用,否则新增行
+        const empty = rows.find(r => !r.querySelector('.item-name').value.trim());
+        if (empty) {
+          empty.querySelector('.item-name').value = name;
+          empty.querySelector('.item-qty').value = 1;
+        } else {
+          addItemRow(name, 1);
+        }
+      }
+      // 反馈动画
+      btn.style.transform = 'scale(0.85)';
+      setTimeout(() => { btn.style.transform = ''; }, 150);
+    });
+  });
+}
+
+// 刷新所有快捷按钮(在切换到 add 标签和数据变化后调用)
+async function refreshQuickButtons() {
+  await renderQuickTechs();
+  await renderQuickChips('customer', 'quickCustomers', 'inCustomer', 8);
+  await renderQuickChips('model', 'quickModels', 'inModel', 6);
+  await renderQuickParts();
+}
+
 // ============== ADD: OCR ==============
 const cameraInput = document.getElementById('cameraInput');
 const galleryInput = document.getElementById('galleryInput');
@@ -1206,7 +1410,13 @@ async function handleImageFile(file) {
     }
     
     ocrStatus.className = 'ocr-status success';
-    ocrStatus.innerHTML = `✓ 识别完成,检测到 ${parsed.items.length} 项物料 · 请检查并修改`;
+    ocrStatus.innerHTML = `
+      ✓ 识别完成,检测到 ${parsed.items.length} 项物料 · 请检查并修改
+      <details style="margin-top: 10px; text-align: left; font-size: 12px;">
+        <summary style="cursor: pointer; color: var(--accent);">📋 点击查看 OCR 原始文字（调试用）</summary>
+        <pre style="margin-top: 8px; padding: 10px; background: var(--bg); border-radius: 6px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-2); line-height: 1.5;">${escapeHtml(text || '(空)')}</pre>
+      </details>
+    `;
   } catch (err) {
     ocrStatus.className = 'ocr-status error';
     ocrStatus.innerHTML = '✗ ' + err.message;
@@ -1260,14 +1470,17 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   document.getElementById('inRefNo').value = '';
   document.getElementById('inCustomer').value = '';
   document.getElementById('inModel').value = '';
+  document.getElementById('inTech').value = ''; // 3 人共用,清空
   document.getElementById('inDate').value = todayStr();
-  // 技术员名字保留(每次都是同一个人,不清空)
   clearItemRows();
   addItemRow();
   previewImg.classList.add('hidden');
   ocrStatus.innerHTML = '';
   cameraInput.value = '';
   galleryInput.value = '';
+  
+  // 刷新快捷按钮(新出现的客户/型号会显示)
+  await refreshQuickButtons();
   
   switchTab('logs');
 });
@@ -1508,17 +1721,20 @@ document.getElementById('statsMonthPicker').addEventListener('change', renderSta
 // ============== SETTINGS ==============
 async function renderSettings() {
   document.getElementById('apiKeyInput').value = (await Data.getSetting('apiKey')) || '';
-  document.getElementById('techNameInput').value = (await Data.getSetting('techName')) || '';
+  
+  // 加载技术员名单
+  const techs = await Data.getSetting('techList') || DEFAULT_TECHS;
+  document.getElementById('techListInput').value = techs.join('\n');
   
   const parts = await Data.getDict('part');
   const customers = await Data.getDict('customer');
   const models = await Data.getDict('model');
-  const techs = await Data.getDict('tech');
+  const techDict = await Data.getDict('tech');
   document.getElementById('dictStats').innerHTML = `
     📦 物料类型 ${parts.length} 种<br>
     🏢 客户 ${customers.length} 个<br>
     🖨 型号 ${models.length} 个<br>
-    👤 技术员 ${techs.length} 人
+    👤 技术员 ${techDict.length} 人
   `;
 }
 
@@ -1527,9 +1743,13 @@ document.getElementById('saveApiKey').addEventListener('click', async () => {
   showToast('✓ API Key 已保存');
 });
 
-document.getElementById('saveTechName').addEventListener('click', async () => {
-  await Data.setSetting('techName', document.getElementById('techNameInput').value.trim());
-  showToast('✓ 已保存');
+document.getElementById('saveTechList').addEventListener('click', async () => {
+  const text = document.getElementById('techListInput').value.trim();
+  const list = text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+  if (list.length === 0) { showToast('至少填一个名字'); return; }
+  await Data.setSetting('techList', list);
+  showToast('✓ 技术员名单已保存');
+  refreshQuickButtons();
 });
 
 // CSV export
@@ -1617,6 +1837,9 @@ document.getElementById('clearData').addEventListener('click', async () => {
   const savedTech = await Data.getSetting('techName');
   if (savedTech) document.getElementById('inTech').value = savedTech;
   addItemRow();
+  
+  // 渲染所有快捷按钮
+  await refreshQuickButtons();
   
   // Register service worker (sw.js needs to be in the same folder)
   if ('serviceWorker' in navigator) {
