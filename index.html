@@ -1048,6 +1048,38 @@
     </div>
 
     <div class="card">
+      <div class="card-title" data-i18n="settings_rename">🔧 批量改名</div>
+      <div style="font-size: 12px; color: var(--text-2); margin-bottom: 10px;" data-i18n="settings_rename_hint">
+        把已有记录里写错的技术员名字 / 客户名 / 公司 一次性改正确。
+      </div>
+      
+      <label class="field-label" data-i18n="rename_field">字段</label>
+      <select id="renameField" style="margin-bottom: 8px;">
+        <option value="tech" data-i18n="rename_tech">技术员</option>
+        <option value="customer" data-i18n="rename_customer">客户</option>
+        <option value="company" data-i18n="rename_company">公司</option>
+        <option value="model" data-i18n="rename_model">型号</option>
+      </select>
+      
+      <div class="form-row">
+        <div>
+          <label class="field-label" data-i18n="rename_from">原名（错的）</label>
+          <input type="text" id="renameFrom" placeholder="saiful">
+        </div>
+        <div>
+          <label class="field-label" data-i18n="rename_to">改成（对的）</label>
+          <input type="text" id="renameTo" placeholder="Saiful">
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button class="btn btn-ghost" id="renamePreview" style="flex: 1;" data-i18n="btn_rename_preview">预览匹配</button>
+        <button class="btn" id="renameApply" style="flex: 1;" data-i18n="btn_rename_apply">执行改名</button>
+      </div>
+      <div id="renameInfo" style="margin-top: 10px; font-size: 12px; color: var(--text-2);"></div>
+    </div>
+
+    <div class="card">
       <div class="card-title" data-i18n="settings_data">💾 数据</div>
       <div style="display: flex; flex-direction: column; gap: 8px;">
         <button class="btn btn-ghost" id="exportCsv" data-i18n="btn_export_csv">📊 导出 CSV（给老板看）</button>
@@ -1386,6 +1418,19 @@ const I18N = {
     settings_dict: '📚 数据字典',
     settings_dict_hint: '系统会记住你用过的物料/客户/型号,下次自动建议。',
     
+    // Rename
+    settings_rename: '🔧 批量改名',
+    settings_rename_hint: '把已有记录里写错的技术员名字 / 客户名 / 公司 一次性改正确。',
+    rename_field: '字段',
+    rename_tech: '技术员',
+    rename_customer: '客户',
+    rename_company: '公司',
+    rename_model: '型号',
+    rename_from: '原名（错的）',
+    rename_to: '改成（对的）',
+    btn_rename_preview: '预览匹配',
+    btn_rename_apply: '执行改名',
+    
     // Toasts
     toast_saved: '已保存',
     toast_updated: '已更新',
@@ -1514,6 +1559,18 @@ const I18N = {
     settings_dict: '📚 Dictionary',
     settings_dict_hint: 'System remembers parts/customers/models you used, auto-suggests next time.',
     
+    settings_rename: '🔧 Bulk Rename',
+    settings_rename_hint: 'Fix misspelled technician/customer/company names across all records at once.',
+    rename_field: 'Field',
+    rename_tech: 'Technician',
+    rename_customer: 'Customer',
+    rename_company: 'Company',
+    rename_model: 'Model',
+    rename_from: 'From (wrong)',
+    rename_to: 'To (correct)',
+    btn_rename_preview: 'Preview Match',
+    btn_rename_apply: 'Apply Rename',
+    
     toast_saved: 'Saved',
     toast_updated: 'Updated',
     toast_deleted: 'Deleted',
@@ -1583,6 +1640,25 @@ function escapeHtml(s) {
 // Normalize part name for grouping (case insensitive, trim, collapse spaces)
 function normalizePart(name) {
   return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// 通用规范化:用于技术员/客户/型号/公司的分组比较(大小写不敏感)
+function normalizeKey(s) {
+  return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// 找出某个分组里"出现频率最高"的原始拼写,作为显示用的规范名
+// 例如 ["Saiful", "saiful", "SAIFUL", "Saiful"] -> 返回 "Saiful"
+function pickCanonicalName(names) {
+  if (!names || names.length === 0) return '';
+  const counts = {};
+  names.forEach(n => {
+    const t = String(n || '').trim();
+    if (!t) return;
+    counts[t] = (counts[t] || 0) + 1;
+  });
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  return sorted[0]?.[0] || '';
 }
 
 // ============== OCR (Gemini AI Vision) ==============
@@ -2830,6 +2906,67 @@ document.getElementById('saveTechList').addEventListener('click', async () => {
   await Data.setSetting('techList', list);
   showToast('✓ 技术员名单已保存');
   refreshQuickButtons();
+});
+
+// ============== BULK RENAME ==============
+async function findRenameMatches() {
+  const field = document.getElementById('renameField').value;
+  const from = document.getElementById('renameFrom').value.trim();
+  if (!from) { showToast(currentLang === 'en' ? 'Enter the wrong name' : '请输入原名'); return null; }
+  
+  const fromLower = from.toLowerCase();
+  const all = await Data.getAllForms();
+  // 匹配:大小写不敏感
+  const matches = all.filter(f => 
+    String(f[field] || '').trim().toLowerCase() === fromLower
+  );
+  return { field, from, matches, all };
+}
+
+document.getElementById('renamePreview').addEventListener('click', async () => {
+  const result = await findRenameMatches();
+  if (!result) return;
+  const info = document.getElementById('renameInfo');
+  if (result.matches.length === 0) {
+    info.innerHTML = `<span style="color: var(--warn);">${currentLang === 'en' ? 'No matching records' : '没有匹配的记录'}</span>`;
+  } else {
+    // 列出所有不同的拼写
+    const variants = [...new Set(result.matches.map(f => String(f[result.field] || '').trim()))];
+    info.innerHTML = `
+      <span style="color: var(--accent);">✓ ${currentLang === 'en' ? 'Found' : '找到'} ${result.matches.length} ${currentLang === 'en' ? 'records' : '条记录'}</span><br>
+      <span style="color: var(--text-3); font-size: 11px;">${currentLang === 'en' ? 'Variants' : '原始拼写'}: ${variants.map(v => `"${escapeHtml(v)}"`).join(', ')}</span>
+    `;
+  }
+});
+
+document.getElementById('renameApply').addEventListener('click', async () => {
+  const result = await findRenameMatches();
+  if (!result) return;
+  
+  const to = document.getElementById('renameTo').value.trim();
+  if (!to) { showToast(currentLang === 'en' ? 'Enter the new name' : '请输入新名'); return; }
+  
+  if (result.matches.length === 0) {
+    showToast(currentLang === 'en' ? 'No matching records' : '没有匹配的记录');
+    return;
+  }
+  
+  const msg = currentLang === 'en' 
+    ? `Rename ${result.matches.length} records' ${result.field} from "${result.from}" to "${to}"?`
+    : `把 ${result.matches.length} 条记录的 ${result.field} 从 "${result.from}" 改成 "${to}"?`;
+  if (!confirm(msg)) return;
+  
+  // 逐条更新
+  for (const f of result.matches) {
+    f[result.field] = to;
+    await Data.updateForm(f);
+  }
+  
+  // 清空
+  document.getElementById('renameFrom').value = '';
+  document.getElementById('renameTo').value = '';
+  document.getElementById('renameInfo').innerHTML = `<span style="color: var(--green);">✓ ${currentLang === 'en' ? 'Renamed' : '已改'} ${result.matches.length} ${currentLang === 'en' ? 'records' : '条'}</span>`;
+  showToast(`✓ ${result.matches.length} ${currentLang === 'en' ? 'records updated' : '条已更新'}`);
 });
 
 // CSV export
