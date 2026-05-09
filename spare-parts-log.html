@@ -5,7 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1a2332">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Parts Log">
 <title>Spare Parts Log · 备件领用</title>
+
+<!-- PWA Manifest (inline, no separate file needed) -->
+<link rel="manifest" href='data:application/manifest+json,{"name":"Spare Parts Log","short_name":"Parts Log","description":"Service Department Daily Requisition","start_url":"./","display":"standalone","orientation":"portrait","background_color":"%230f1722","theme_color":"%231a2332","icons":[{"src":"data:image/svg%2Bxml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 192 192%22><rect width=%22192%22 height=%22192%22 rx=%2240%22 fill=%22%231a2332%22/><rect x=%2240%22 y=%2250%22 width=%22112%22 height=%2295%22 rx=%228%22 fill=%22%234ecdc4%22/><rect x=%2256%22 y=%2270%22 width=%2280%22 height=%226%22 fill=%22%231a2332%22/><rect x=%2256%22 y=%2286%22 width=%2260%22 height=%226%22 fill=%22%231a2332%22/><rect x=%2256%22 y=%22102%22 width=%2270%22 height=%226%22 fill=%22%231a2332%22/><rect x=%2256%22 y=%22118%22 width=%2250%22 height=%226%22 fill=%22%231a2332%22/></svg>","sizes":"192x192","type":"image/svg+xml"},{"src":"data:image/svg%2Bxml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22><rect width=%22512%22 height=%22512%22 rx=%22100%22 fill=%22%231a2332%22/><rect x=%22106%22 y=%22134%22 width=%22300%22 height=%22250%22 rx=%2220%22 fill=%22%234ecdc4%22/><rect x=%22148%22 y=%22186%22 width=%22216%22 height=%2216%22 fill=%22%231a2332%22/><rect x=%22148%22 y=%22228%22 width=%22160%22 height=%2216%22 fill=%22%231a2332%22/><rect x=%22148%22 y=%22270%22 width=%22188%22 height=%2216%22 fill=%22%231a2332%22/><rect x=%22148%22 y=%22312%22 width=%22134%22 height=%2216%22 fill=%22%231a2332%22/></svg>","sizes":"512x512","type":"image/svg+xml"}]}'>
+
+<!-- Apple touch icon (for iOS home screen) -->
+<link rel="apple-touch-icon" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180"><rect width="180" height="180" rx="40" fill="%231a2332"/><rect x="38" y="48" width="104" height="88" rx="8" fill="%234ecdc4"/><rect x="52" y="66" width="76" height="6" fill="%231a2332"/><rect x="52" y="80" width="56" height="6" fill="%231a2332"/><rect x="52" y="94" width="66" height="6" fill="%231a2332"/><rect x="52" y="108" width="46" height="6" fill="%231a2332"/></svg>'>
+<link rel="icon" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="%231a2332"/><rect x="14" y="18" width="36" height="30" rx="3" fill="%234ecdc4"/><rect x="20" y="24" width="24" height="2" fill="%231a2332"/><rect x="20" y="29" width="18" height="2" fill="%231a2332"/><rect x="20" y="34" width="22" height="2" fill="%231a2332"/><rect x="20" y="39" width="14" height="2" fill="%231a2332"/></svg>'>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -582,6 +591,14 @@
       </div>
       
       <div class="form-group">
+        <label class="field-label">技术员 Technician</label>
+        <div class="input-wrap">
+          <input type="text" id="inTech" placeholder="如:SAIFU" autocomplete="off">
+          <div class="suggestions" id="techSuggestions"></div>
+        </div>
+      </div>
+      
+      <div class="form-group">
         <label class="field-label">客户名 Customer</label>
         <div class="input-wrap">
           <input type="text" id="inCustomer" placeholder="如:Hey Stationery" autocomplete="off">
@@ -643,6 +660,7 @@
         <button class="stat-tab active" data-stat="parts">按物料</button>
         <button class="stat-tab" data-stat="customers">按客户</button>
         <button class="stat-tab" data-stat="models">按型号</button>
+        <button class="stat-tab" data-stat="techs">按技术员</button>
       </div>
 
       <div id="statsList"></div>
@@ -893,7 +911,7 @@ async function ocrImage(file) {
 
 // Parse spare-part form text into structured data
 async function parseFormText(text) {
-  const result = { date: '', refNo: '', customer: '', model: '', items: [] };
+  const result = { date: '', refNo: '', customer: '', model: '', tech: '', items: [] };
   if (!text) return result;
   
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
@@ -920,6 +938,15 @@ async function parseFormText(text) {
   if (custMatch) {
     let c = custMatch[1].trim().split(/\s{2,}/)[0].slice(0, 40);
     if (c.length > 1 && c.length < 40) result.customer = c;
+  }
+  
+  // Technician: "REQUESTOR NAME: XXX" 或 "TECHNICIAN NAME: XXX" 或 表底 "NAME: XXX"
+  const techMatch = text.match(/(?:REQUESTOR|TECHNICIAN|TECH)\s*NAME[\s:]*([^\n\r]+)/i);
+  if (techMatch) {
+    let t = techMatch[1].trim().split(/\s{2,}/)[0].slice(0, 30);
+    // 去掉可能跟在后面的 REF NO 等字样
+    t = t.replace(/REF\s*NO.*$/i, '').replace(/DATE.*$/i, '').trim();
+    if (t.length > 0 && t.length < 30) result.tech = t;
   }
   
   // Items: look for known part keywords
@@ -1069,6 +1096,7 @@ async function setupAutocomplete(input, sugBox, type) {
 }
 
 // Setup main inputs
+setupAutocomplete(document.getElementById('inTech'), document.getElementById('techSuggestions'), 'tech');
 setupAutocomplete(document.getElementById('inCustomer'), document.getElementById('customerSuggestions'), 'customer');
 setupAutocomplete(document.getElementById('inModel'), document.getElementById('modelSuggestions'), 'model');
 
@@ -1094,6 +1122,7 @@ fileInput.addEventListener('change', async (e) => {
     
     if (parsed.date) document.getElementById('inDate').value = parsed.date;
     if (parsed.refNo) document.getElementById('inRefNo').value = parsed.refNo;
+    if (parsed.tech) document.getElementById('inTech').value = parsed.tech;
     if (parsed.customer) document.getElementById('inCustomer').value = parsed.customer;
     if (parsed.model) document.getElementById('inModel').value = parsed.model;
     
@@ -1114,6 +1143,7 @@ fileInput.addEventListener('change', async (e) => {
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const date = document.getElementById('inDate').value;
   const refNo = document.getElementById('inRefNo').value.trim();
+  const tech = document.getElementById('inTech').value.trim();
   const customer = document.getElementById('inCustomer').value.trim();
   const model = document.getElementById('inModel').value.trim();
   const items = getItems();
@@ -1123,7 +1153,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   
   const isEditing = document.getElementById('saveBtn').dataset.editId;
   const formData = {
-    date, refNo, customer, model, items,
+    date, refNo, tech, customer, model, items,
     createdAt: Date.now()
   };
   
@@ -1139,15 +1169,22 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   }
   
   // Update dictionaries
+  if (tech) await Data.bumpDict('tech', tech);
   if (customer) await Data.bumpDict('customer', customer);
   if (model) await Data.bumpDict('model', model);
   for (const it of items) await Data.bumpDict('part', it.name);
+  
+  // 自动保存技术员名(如果设置里没有)
+  if (tech && !(await Data.getSetting('techName'))) {
+    await Data.setSetting('techName', tech);
+  }
   
   // Reset
   document.getElementById('inRefNo').value = '';
   document.getElementById('inCustomer').value = '';
   document.getElementById('inModel').value = '';
   document.getElementById('inDate').value = todayStr();
+  // 技术员名字保留(每次都是同一个人,不清空)
   clearItemRows();
   addItemRow();
   previewImg.classList.add('hidden');
@@ -1187,7 +1224,7 @@ async function renderLogs() {
     <div class="log-entry" data-id="${f.id}">
       <div class="head">
         <div>
-          <div class="ref">${f.refNo ? '#' + escapeHtml(f.refNo) : ''}</div>
+          <div class="ref">${f.refNo ? '#' + escapeHtml(f.refNo) : ''}${f.tech ? (f.refNo ? ' · ' : '') + '👤 ' + escapeHtml(f.tech) : ''}</div>
           <div class="customer">${escapeHtml(f.customer || '(无客户名)')}</div>
         </div>
         ${f.model ? `<div class="model">${escapeHtml(f.model)}</div>` : ''}
@@ -1218,7 +1255,7 @@ async function openDetail(id) {
   const totalQty = f.items.reduce((s, it) => s + (it.qty || 0), 0);
   
   document.getElementById('detailContent').innerHTML = `
-    <div style="font-size: 13px; color: var(--text-3); margin-bottom: 4px;">${f.refNo ? 'Ref #' + escapeHtml(f.refNo) + ' · ' : ''}${f.date}</div>
+    <div style="font-size: 13px; color: var(--text-3); margin-bottom: 4px;">${f.refNo ? 'Ref #' + escapeHtml(f.refNo) + ' · ' : ''}${f.date}${f.tech ? ' · 👤 ' + escapeHtml(f.tech) : ''}</div>
     <div style="font-size: 18px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(f.customer || '(无客户)')}</div>
     ${f.model ? `<div style="display: inline-block; background: var(--bg-3); color: var(--accent); padding: 4px 10px; border-radius: 5px; font-size: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 600; margin-bottom: 14px;">${escapeHtml(f.model)}</div>` : ''}
     
@@ -1248,6 +1285,7 @@ document.getElementById('editForm').addEventListener('click', async () => {
   
   document.getElementById('inDate').value = f.date;
   document.getElementById('inRefNo').value = f.refNo || '';
+  document.getElementById('inTech').value = f.tech || '';
   document.getElementById('inCustomer').value = f.customer || '';
   document.getElementById('inModel').value = f.model || '';
   clearItemRows();
@@ -1324,6 +1362,13 @@ async function renderStats() {
       stats[key].qty += f.items.reduce((s, it) => s + it.qty, 0);
       stats[key].forms += 1;
     });
+  } else if (statMode === 'techs') {
+    monthForms.forEach(f => {
+      const key = (f.tech || '(无技术员)').trim();
+      if (!stats[key]) stats[key] = { name: key, qty: 0, forms: 0 };
+      stats[key].qty += f.items.reduce((s, it) => s + it.qty, 0);
+      stats[key].forms += 1;
+    });
   }
   
   const arr = Object.values(stats).sort((a, b) => b.qty - a.qty);
@@ -1390,10 +1435,12 @@ async function renderSettings() {
   const parts = await Data.getDict('part');
   const customers = await Data.getDict('customer');
   const models = await Data.getDict('model');
+  const techs = await Data.getDict('tech');
   document.getElementById('dictStats').innerHTML = `
     📦 物料类型 ${parts.length} 种<br>
     🏢 客户 ${customers.length} 个<br>
-    🖨 型号 ${models.length} 个
+    🖨 型号 ${models.length} 个<br>
+    👤 技术员 ${techs.length} 人
   `;
 }
 
@@ -1413,11 +1460,11 @@ document.getElementById('exportCsv').addEventListener('click', async () => {
   if (all.length === 0) { showToast('暂无数据'); return; }
   
   // CSV: each item is a row
-  const headers = ['Date', 'Ref No', 'Customer', 'Model', 'Part', 'Qty'];
+  const headers = ['Date', 'Ref No', 'Technician', 'Customer', 'Model', 'Part', 'Qty'];
   const rows = [];
   all.forEach(f => {
     f.items.forEach(it => {
-      rows.push([f.date, f.refNo || '', f.customer || '', f.model || '', it.name, it.qty]);
+      rows.push([f.date, f.refNo || '', f.tech || '', f.customer || '', f.model || '', it.name, it.qty]);
     });
   });
   
@@ -1436,10 +1483,11 @@ document.getElementById('exportJson').addEventListener('click', async () => {
   const dictParts = await Data.getDict('part');
   const dictCustomers = await Data.getDict('customer');
   const dictModels = await Data.getDict('model');
+  const dictTechs = await Data.getDict('tech');
   const blob = new Blob([JSON.stringify({
     exportedAt: new Date().toISOString(),
     forms: all,
-    dict: { parts: dictParts, customers: dictCustomers, models: dictModels }
+    dict: { parts: dictParts, customers: dictCustomers, models: dictModels, techs: dictTechs }
   }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1466,6 +1514,7 @@ document.getElementById('importFile').addEventListener('change', async (e) => {
       for (const p of (data.dict.parts || [])) await Data.bumpDict('part', p.name);
       for (const c of (data.dict.customers || [])) await Data.bumpDict('customer', c.name);
       for (const m of (data.dict.models || [])) await Data.bumpDict('model', m.name);
+      for (const t of (data.dict.techs || [])) await Data.bumpDict('tech', t.name);
     }
     showToast(`✓ 已导入 ${count} 张表`);
     renderSettings();
@@ -1486,7 +1535,17 @@ document.getElementById('clearData').addEventListener('click', async () => {
 (async () => {
   await openDB();
   document.getElementById('inDate').value = todayStr();
+  // 自动填入设置里的技术员名字
+  const savedTech = await Data.getSetting('techName');
+  if (savedTech) document.getElementById('inTech').value = savedTech;
   addItemRow();
+  
+  // Register service worker (sw.js needs to be in the same folder)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      // 离线功能不可用,但 App 仍能正常工作
+    });
+  }
 })();
 </script>
 </body>
