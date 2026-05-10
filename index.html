@@ -415,58 +415,30 @@
   
   /* 物料行包装 */
   .item-row-wrap {
-    margin-bottom: 12px;
-  }
-  .item-row-wrap.has-override .item-row {
-    margin-bottom: 4px;
+    margin-bottom: 14px;
+    padding: 8px 8px 6px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
   }
   
-  /* 物料行的折叠"客户/型号"按钮 */
-  .item-override-row { margin-top: 0; }
-  .override-toggle {
-    background: none;
-    border: 1px dashed var(--line-soft);
-    color: var(--text-3);
-    font-family: inherit;
-    font-size: 11px;
-    padding: 5px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    width: 100%;
-    text-align: left;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.15s;
-  }
-  .override-toggle:hover {
-    background: var(--bg-3);
-    color: var(--text-2);
-  }
-  .override-toggle.has-data {
-    color: var(--accent);
-    border-color: rgba(106, 199, 187, 0.5);
-    border-style: solid;
-    background: rgba(106, 199, 187, 0.06);
-  }
-  .override-toggle .toggle-icon {
-    font-size: 9px;
-    flex-shrink: 0;
-  }
-  .item-override-fields {
+  /* 物料行第二排:客户 + 型号 */
+  .item-row-customer {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 6px;
     margin-top: 6px;
-    padding: 8px;
-    background: rgba(106, 199, 187, 0.04);
-    border-radius: 6px;
-    border: 1px solid rgba(106, 199, 187, 0.15);
   }
-  .item-override-fields input {
+  .item-row-customer input {
     padding: 8px 10px;
-    font-size: 13px;
-    background: var(--bg);
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .item-row-customer input:focus {
+    color: var(--text);
+  }
+  .item-row-customer input:not(:placeholder-shown) {
+    color: var(--accent);
+    font-weight: 500;
   }
 
   .add-item-btn {
@@ -1451,6 +1423,7 @@ const I18N = {
     placeholder_tech: '点上方按钮快速选择,或手动输入',
     placeholder_customer: '点上方常用客户,或手动输入',
     placeholder_model: '点上方常用型号,或手动输入',
+    label_default_hint: '(默认 · 物料行可单独覆盖)',
     
     card_items: '🔧 物料清单 Items',
     quick_parts_label: '⚡ 快捷添加（点一下加 1 件）',
@@ -1599,6 +1572,7 @@ const I18N = {
     placeholder_tech: 'Tap button or type',
     placeholder_customer: 'Tap a frequent customer or type',
     placeholder_model: 'Tap a frequent model or type',
+    label_default_hint: '(default · row can override)',
     
     card_items: '🔧 Items',
     quick_parts_label: '⚡ Quick Add (tap to add 1)',
@@ -1858,18 +1832,23 @@ CRITICAL DATE PARSING RULES:
 - NEVER swap day and month
 - If only DD/MM/YY is shown, assume 20YY
 
-PER-ITEM CUSTOMER & MODEL (important - forms often have multiple customers):
-- Each row in the items table can have its OWN customer and model (in CUSTOMER NAME and MODEL columns)
-- Read EACH row's customer and model separately
-- For top-level "customer" and "model" fields, use the MOST COMMON one across all rows
-- For each item, fill "customer" and "model" with that specific row's value
-- If a row's customer/model is the SAME as the top-level default, you can leave the item's "customer"/"model" empty (saves space)
-- If a row's customer/model is DIFFERENT from the default, MUST fill it in for that item
-- Example: form has 3 rows. Row 1,2 = "MK Network" / "ADV5235". Row 3 = "TS Teoh" / "ADV5560".
+PER-ITEM CUSTOMER & MODEL (VERY IMPORTANT - READ CAREFULLY):
+- The form has a CUSTOMER NAME column and a MODEL column for EACH ROW
+- You MUST read CUSTOMER NAME and MODEL for EVERY single row separately
+- Different rows often have DIFFERENT customers and DIFFERENT models
+- Read carefully even if customers are written as abbreviations (e.g. "TS Teoh", "MK Network", "Kn", etc)
+- Standardize MODEL to UPPERCASE
+- For each item, ALWAYS fill "customer" and "model" with that row's actual value
+- DO NOT leave them empty unless the cell is genuinely blank in the form
+- For top-level "customer"/"model": pick the MOST COMMON value across rows
+- Example: Row 1 = "MK Network" / "ADV5235", Row 2 = "MK Network" / "ADV5235", Row 3 = "TS Teoh" / "ADV5560"
   → top-level customer="MK Network", model="ADV5235"
-  → items[0].customer="" items[0].model="" (same as default, leave empty)
-  → items[1].customer="" items[1].model="" (same as default, leave empty)
-  → items[2].customer="TS Teoh" items[2].model="ADV5560" (different, MUST fill)
+  → items[0].customer="MK Network", items[0].model="ADV5235"
+  → items[1].customer="MK Network", items[1].model="ADV5235"  
+  → items[2].customer="TS Teoh", items[2].model="ADV5560"
+- LOOK AT BOTH the consumable section AND the toner section
+- The CUSTOMER NAME column is right after the MODEL column - don't skip it
+- If the customer name handwriting is unclear, give your best interpretation
 
 OTHER RULES:
 - Read all rows in DESCRIPTION column (BOTH the consumable section AND the TONER section)
@@ -1979,7 +1958,6 @@ const itemsContainer = document.getElementById('itemsContainer');
 function addItemRow(name = '', qty = 1, price = null, customer = '', model = '') {
   const row = document.createElement('div');
   row.className = 'item-row-wrap';
-  const hasOverride = (customer && customer.trim()) || (model && model.trim());
   row.innerHTML = `
     <div class="item-row">
       <div class="input-wrap">
@@ -1990,20 +1968,14 @@ function addItemRow(name = '', qty = 1, price = null, customer = '', model = '')
       <input type="number" class="item-price" min="0" step="0.01" placeholder="单价" value="${price !== null ? price : ''}">
       <button type="button" class="remove-btn" title="删除">×</button>
     </div>
-    <div class="item-override-row">
-      <button type="button" class="override-toggle ${hasOverride ? 'has-data' : ''}" title="为此物料单独指定客户/型号">
-        <span class="toggle-icon">${hasOverride ? '▼' : '▸'}</span>
-        <span class="toggle-label">${hasOverride ? '该物料客户/型号 ↓' : '+ 不同客户/型号 (可选)'}</span>
-      </button>
-      <div class="item-override-fields ${hasOverride ? '' : 'hidden'}">
-        <div class="input-wrap" style="flex: 1;">
-          <input type="text" class="item-customer" placeholder="此行客户(留空=用上面的)" value="${escapeHtml(customer)}" autocomplete="off">
-          <div class="suggestions"></div>
-        </div>
-        <div class="input-wrap" style="flex: 1;">
-          <input type="text" class="item-model" placeholder="此行型号(留空=用上面的)" value="${escapeHtml(model)}" autocomplete="off">
-          <div class="suggestions"></div>
-        </div>
+    <div class="item-row-customer">
+      <div class="input-wrap" style="flex: 1;">
+        <input type="text" class="item-customer" placeholder="客户(留空=用上面默认)" value="${escapeHtml(customer)}" autocomplete="off">
+        <div class="suggestions"></div>
+      </div>
+      <div class="input-wrap" style="flex: 1;">
+        <input type="text" class="item-model" placeholder="型号(留空=用上面默认)" value="${escapeHtml(model)}" autocomplete="off">
+        <div class="suggestions"></div>
       </div>
     </div>
   `;
@@ -2016,36 +1988,8 @@ function addItemRow(name = '', qty = 1, price = null, customer = '', model = '')
   const modelInput = row.querySelector('.item-model');
   const sugBox = row.querySelector('.item-row .suggestions');
   setupAutocomplete(nameInput, sugBox, 'part');
-  // 让客户/型号字段也有自动建议
   setupAutocomplete(customerInput, customerInput.parentElement.querySelector('.suggestions'), 'customer');
   setupAutocomplete(modelInput, modelInput.parentElement.querySelector('.suggestions'), 'model');
-  
-  // 折叠展开按钮
-  const overrideBtn = row.querySelector('.override-toggle');
-  const overrideFields = row.querySelector('.item-override-fields');
-  overrideBtn.addEventListener('click', () => {
-    const isHidden = overrideFields.classList.contains('hidden');
-    overrideFields.classList.toggle('hidden');
-    const hasData = (customerInput.value.trim() || modelInput.value.trim());
-    overrideBtn.querySelector('.toggle-icon').textContent = isHidden ? '▼' : '▸';
-    overrideBtn.querySelector('.toggle-label').textContent = isHidden 
-      ? '该物料客户/型号 ↓' 
-      : (hasData ? '该物料客户/型号 ↓' : '+ 不同客户/型号 (可选)');
-    overrideBtn.classList.toggle('has-data', !!(customerInput.value.trim() || modelInput.value.trim()));
-  });
-  
-  // 客户/型号变化时更新按钮状态
-  [customerInput, modelInput].forEach(inp => {
-    inp.addEventListener('blur', () => {
-      const hasData = customerInput.value.trim() || modelInput.value.trim();
-      overrideBtn.classList.toggle('has-data', !!hasData);
-      if (!overrideFields.classList.contains('hidden')) {
-        overrideBtn.querySelector('.toggle-label').textContent = hasData 
-          ? '该物料客户/型号 ↓' 
-          : '+ 不同客户/型号 (可选)';
-      }
-    });
-  });
   
   // 物料名变化时自动从价格库填入价格
   nameInput.addEventListener('blur', async () => {
