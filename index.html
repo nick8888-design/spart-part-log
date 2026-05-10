@@ -2009,8 +2009,18 @@ OTHER RULES:
 - For QTY, read the number in the QTY column on each row
 - Common parts: DRUM, TONER C/M/Y/K, CHARGER ROLLER, PICK UP ROLLER, ADF BELT UNIT, FUSER, DEVELOPER, CLEANING BLADE, SLEEVE FILM, ELEMENT BAR, PCCB, CB
 - Standardize part names to UPPERCASE
+
+⚠️ CRITICAL - DO NOT MERGE ROWS:
+- EACH ROW in the form is a SEPARATE item, even if they look related
+- DO NOT combine adjacent rows into one item, EVEN if they could form a compound name
+- Example: if row 1 says "DRUM" and row 2 says "C/BLADE" (or "CLEANING BLADE"), these are TWO separate items, NOT "DRUM CLEANING BLADE"
+- Each line written by the technician = one item entry
+- Count by LINE BREAKS in the form, not by what makes sense as a phrase
+- "C/BLADE" or "C BLADE" should be read as "CLEANING BLADE" (a single part, not combined with previous row)
+
 - If handwriting is unclear, give your best interpretation based on context
-- Skip empty rows
+- Skip ONLY truly empty rows (no text at all)
+- If a row has crossed-out text AND new text written above/beside, use the NEW text and ignore the crossed-out
 - Return ONLY the JSON object, nothing else, no markdown fences`;
   
   const body = {
@@ -2068,18 +2078,27 @@ async function parseFormText(text) {
     if (parsed.model) result.model = String(parsed.model).trim().toUpperCase();
     
     if (Array.isArray(parsed.items)) {
-      const seen = new Set();
+      // 用 Map 跟踪同名物料,数量累加(不再丢弃重复)
+      // key: 物料名+客户+型号 的组合,这样不同客户的同名物料不会合并
+      const itemMap = new Map();
       for (const it of parsed.items) {
         if (!it || !it.name) continue;
         const name = String(it.name).trim();
         const qty = parseInt(it.qty) || 1;
         const norm = normalizePart(name);
-        if (!norm || seen.has(norm)) continue;
-        seen.add(norm);
+        if (!norm) continue;
         const itemCustomer = it.customer ? String(it.customer).trim() : '';
         const itemModel = it.model ? String(it.model).trim().toUpperCase() : '';
-        result.items.push({ name, qty, customer: itemCustomer, model: itemModel });
+        // 复合 key: 名+客户+型号
+        const dedupKey = `${norm}::${itemCustomer.toLowerCase()}::${itemModel.toLowerCase()}`;
+        if (itemMap.has(dedupKey)) {
+          // 同名+同客户+同型号 -> 累加数量
+          itemMap.get(dedupKey).qty += qty;
+        } else {
+          itemMap.set(dedupKey, { name, qty, customer: itemCustomer, model: itemModel });
+        }
       }
+      result.items = [...itemMap.values()];
     }
   } catch (e) {
     console.error('Parse JSON failed:', e, text);
