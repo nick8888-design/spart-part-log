@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#1a2332">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Parts Log">
-<title>Spare Parts Log · 备件领用</title>
+<title>🔐 Admin · 管理后台</title>
 
 <!-- PWA Manifest (inline, no separate file needed) -->
 <link rel="manifest" href="./manifest.json">
@@ -941,28 +941,53 @@
 </head>
 <body>
 
-<div class="container">
+<!-- 🔐 登录门 -->
+<div id="loginGate" style="position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px;">
+  <div style="max-width: 360px; width: 100%; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 30px 24px;">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div style="font-size: 44px; margin-bottom: 8px;">🔐</div>
+      <h1 style="font-size: 20px; color: var(--text); margin-bottom: 4px;">管理后台</h1>
+      <div style="font-size: 12px; color: var(--text-3); font-style: italic;">Admin Panel · Authentication Required</div>
+    </div>
+    
+    <div style="margin-bottom: 14px;">
+      <label class="field-label">管理员密码</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" autofocus>
+    </div>
+    
+    <button class="btn" id="loginBtn" style="width: 100%;">🔓 登 录</button>
+    
+    <div id="loginError" style="margin-top: 12px; color: var(--warn); font-size: 12px; text-align: center; min-height: 16px;"></div>
+    
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed var(--line); font-size: 11px; color: var(--text-3); text-align: center; line-height: 1.6;">
+      默认密码: <code style="background: var(--bg-3); padding: 2px 6px; border-radius: 3px; color: var(--accent);">admin1234</code><br>
+      登录后可以在"修改密码"卡片改成自己的
+    </div>
+  </div>
+</div>
+
+<div class="container" id="adminContainer" style="display: none;">
   <header class="header">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
       <div style="flex: 1;">
-        <h1 data-i18n="app_title">Spare Parts Log <span class="badge">TECH</span></h1>
-        <div class="sub" data-i18n="app_subtitle">Service Department · Daily Requisition</div>
+        <h1>🔐 Admin Panel <span class="badge" style="background: var(--warn); color: var(--bg);">ADMIN</span></h1>
+        <div class="sub">管理后台 · System Configuration</div>
       </div>
-      <div class="lang-switch">
-        <button class="lang-btn active" data-lang="zh">中</button>
-        <button class="lang-btn" data-lang="en">EN</button>
-      </div>
+      <button id="logoutBtn" style="background: var(--bg-3); border: 1px solid var(--line); color: var(--text-2); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 12px;">🚪 退出</button>
+    </div>
+    <div style="margin-top: 10px; padding: 8px 12px; background: rgba(255, 169, 77, 0.1); border-left: 3px solid var(--warn); border-radius: 4px; font-size: 11px; color: var(--text-2); line-height: 1.5;">
+      ⚠️ 此页面只有管理员能访问。所有改动会立刻应用到普通用户的 App。
     </div>
   </header>
 
   <nav class="tabs">
-    <button class="tab active" data-tab="add" data-i18n="tab_add">+ 新增</button>
-    <button class="tab" data-tab="logs" data-i18n="tab_logs">记录</button>
-    <button class="tab" data-tab="stats" data-i18n="tab_stats">统计</button>
+    <button class="tab active" data-tab="settings">⚙️ 设置</button>
+    <button class="tab" data-tab="logs">📋 全部记录</button>
+    <button class="tab" data-tab="stats">📊 统计</button>
   </nav>
 
   <!-- ADD TAB -->
-  <section id="tab-add" class="tab-content">
+  <section id="tab-add" class="tab-content hidden">
     <div class="card">
       <div class="card-title" data-i18n="card_scan">📷 扫描表单（可选）</div>
       <div class="upload-buttons">
@@ -1153,7 +1178,24 @@
   </section>
 
   <!-- SETTINGS TAB -->
-  <section id="tab-settings" class="tab-content hidden">
+  <section id="tab-settings" class="tab-content">
+    <div class="card">
+      <div class="card-title">🔐 修改管理员密码</div>
+      <div style="font-size: 12px; color: var(--text-2); margin-bottom: 10px;">
+        默认密码是 <code style="background: var(--bg-3); padding: 2px 6px; border-radius: 3px; color: var(--accent);">admin1234</code>,建议改成自己的。
+      </div>
+      <div class="form-group">
+        <label class="field-label">新密码</label>
+        <input type="password" id="newAdminPassword" placeholder="至少 4 位">
+      </div>
+      <div class="form-group">
+        <label class="field-label">再次确认</label>
+        <input type="password" id="confirmAdminPassword" placeholder="重复输入新密码">
+      </div>
+      <button class="btn" id="changePasswordBtn">💾 保存新密码</button>
+      <div id="passwordChangeInfo" style="margin-top: 10px; font-size: 12px;"></div>
+    </div>
+
     <div class="card">
       <div class="card-title" data-i18n="settings_api">🔑 OpenAI GPT-4o</div>
       <label class="field-label" data-i18n="settings_api_label">OpenAI API Key</label>
@@ -1287,7 +1329,7 @@
   </section>
 </div>
 
-<button class="fab" id="fab" title="快速添加">+</button>
+<!-- fab 浮动按钮已删除(admin 不需要快速添加) -->
 
 <!-- Detail modal -->
 <div class="modal-bg" id="detailModal">
@@ -1321,6 +1363,87 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ============== 🔐 ADMIN LOGIN GATE ==============
+// 默认密码是 admin1234,登录后可以在管理页改
+const DEFAULT_ADMIN_PASSWORD = 'admin1234';
+
+// 简单 hash 函数(让密码不要明文存)
+async function hashPassword(pwd) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(pwd + 'spareparts_salt_2025');
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function getAdminPasswordHash() {
+  const stored = localStorage.getItem('adminPwdHash');
+  if (stored) return stored;
+  // 第一次:用默认密码生成 hash
+  return await hashPassword(DEFAULT_ADMIN_PASSWORD);
+}
+
+async function setAdminPasswordHash(newPassword) {
+  const hash = await hashPassword(newPassword);
+  localStorage.setItem('adminPwdHash', hash);
+}
+
+async function tryLogin(password) {
+  const inputHash = await hashPassword(password);
+  const storedHash = await getAdminPasswordHash();
+  return inputHash === storedHash;
+}
+
+// 登录页交互
+const loginGate = document.getElementById('loginGate');
+const adminContainer = document.getElementById('adminContainer');
+const loginPassword = document.getElementById('loginPassword');
+const loginBtn = document.getElementById('loginBtn');
+const loginError = document.getElementById('loginError');
+
+async function doLogin() {
+  const pwd = loginPassword.value;
+  if (!pwd) { loginError.textContent = '请输入密码'; return; }
+  loginBtn.disabled = true;
+  loginBtn.textContent = '...登录中';
+  
+  const ok = await tryLogin(pwd);
+  
+  if (ok) {
+    // 设置一个 session 标记(关闭浏览器后失效)
+    sessionStorage.setItem('adminLoggedIn', 'true');
+    loginGate.style.display = 'none';
+    adminContainer.style.display = '';
+    loginError.textContent = '';
+    loginPassword.value = '';
+  } else {
+    loginError.textContent = '✗ 密码错误';
+    loginPassword.value = '';
+    loginBtn.disabled = false;
+    loginBtn.textContent = '🔓 登 录';
+    setTimeout(() => { loginPassword.focus(); }, 100);
+  }
+  loginBtn.disabled = false;
+  loginBtn.textContent = '🔓 登 录';
+}
+
+loginBtn.addEventListener('click', doLogin);
+loginPassword.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// 退出登录
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  if (!confirm('确定退出管理后台?')) return;
+  sessionStorage.removeItem('adminLoggedIn');
+  location.reload();
+});
+
+// 检查是否已登录(本次 session)
+if (sessionStorage.getItem('adminLoggedIn') === 'true') {
+  loginGate.style.display = 'none';
+  adminContainer.style.display = '';
+}
+
 // ============== DATA LAYER ==============
 const DB_NAME = 'sparePartsDB';
 const DB_VERSION = 5;
@@ -2149,7 +2272,7 @@ function switchTab(name) {
   if (name === 'settings') renderSettings();
 }
 
-document.getElementById('fab').addEventListener('click', () => switchTab('add'));
+// fab 已删除 - admin 不需要
 
 // ============== ADD: Item rows ==============
 const itemsContainer = document.getElementById('itemsContainer');
@@ -3749,6 +3872,28 @@ document.getElementById('saveApiKey').addEventListener('click', async () => {
   showToast('✓ API Key 已保存');
 });
 
+// ===== 修改管理员密码 =====
+document.getElementById('changePasswordBtn').addEventListener('click', async () => {
+  const newPwd = document.getElementById('newAdminPassword').value;
+  const confirm = document.getElementById('confirmAdminPassword').value;
+  const info = document.getElementById('passwordChangeInfo');
+  
+  if (!newPwd || newPwd.length < 4) {
+    info.innerHTML = '<span style="color: var(--warn);">密码至少 4 位</span>';
+    return;
+  }
+  if (newPwd !== confirm) {
+    info.innerHTML = '<span style="color: var(--warn);">两次密码不一致</span>';
+    return;
+  }
+  
+  await setAdminPasswordHash(newPwd);
+  document.getElementById('newAdminPassword').value = '';
+  document.getElementById('confirmAdminPassword').value = '';
+  info.innerHTML = '<span style="color: var(--green);">✓ 密码已修改</span><br><span style="color: var(--text-3); font-size: 11px;">下次登录用新密码</span>';
+  showToast('✓ 密码已修改');
+});
+
 document.getElementById('saveTechList').addEventListener('click', async () => {
   const text = document.getElementById('techListInput').value.trim();
   const list = text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
@@ -3915,19 +4060,15 @@ document.getElementById('clearData').addEventListener('click', async () => {
   // 渲染所有快捷按钮
   await refreshQuickButtons();
   
-  // 绑定语言切换按钮
-  document.querySelectorAll('.lang-btn').forEach(btn => {
-    btn.addEventListener('click', () => setLang(btn.dataset.lang));
-  });
-  // 应用保存的语言
-  setLang(currentLang);
-  
-  // Register service worker (sw.js needs to be in the same folder)
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {
-      // 离线功能不可用,但 App 仍能正常工作
-    });
+  // admin 默认中文,不需要语言切换
+  if (typeof setLang === 'function') {
+    setLang('zh');
   }
+  
+  // 进入设置 tab(管理员主页面)
+  switchTab('settings');
+  
+  // 不注册 service worker(admin 总是要联网)
 })();
 </script>
 </body>
