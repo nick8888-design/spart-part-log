@@ -1564,6 +1564,8 @@ const I18N = {
     btn_camera_hint: '现场拍新表',
     btn_gallery: '相 册',
     btn_gallery_hint: '从手机选已有照片',
+    btn_batch: '📚 批量上传 · Batch Upload',
+    btn_batch_hint: '一次选多张表自动识别保存',
     preview_zoom_hint: '📷 点击放大查看 · Tap to zoom',
     
     card_form_info: '📋 表单信息',
@@ -1713,6 +1715,8 @@ const I18N = {
     btn_camera_hint: 'Take new photo',
     btn_gallery: 'Gallery',
     btn_gallery_hint: 'Pick from phone',
+    btn_batch: '📚 Batch Upload · 批量上传',
+    btn_batch_hint: 'Select multiple receipts at once',
     preview_zoom_hint: '📷 Tap to zoom · 点击放大',
     
     card_form_info: '📋 Form Info',
@@ -2004,23 +2008,41 @@ PER-ITEM CUSTOMER & MODEL (VERY IMPORTANT - READ CAREFULLY):
 - The CUSTOMER NAME column is right after the MODEL column - don't skip it
 - If the customer name handwriting is unclear, give your best interpretation
 
+⚠️⚠️⚠️ MOST CRITICAL RULE - DO NOT EVER MERGE ROWS ⚠️⚠️⚠️
+This is the #1 mistake to avoid. Read carefully:
+
+- The form has many separate ROWS in the DESCRIPTION column
+- Each row was written separately by the technician on a different line
+- Each row = ONE separate item in the JSON output
+- NEVER combine 2 rows into 1 item, even if their text could form a compound name
+- NEVER add words from one row to another row
+
+EXAMPLES of what NOT to do:
+- ❌ Row 1 says "DRUM" and Row 2 says "C/BLADE" → DO NOT output {"name":"DRUM CLEANING BLADE"}
+- ❌ Row 1 says "DRUM" and Row 2 says "BLADE" → DO NOT output {"name":"DRUM BLADE"}
+- ❌ Row 1 says "PICK UP" and Row 2 says "ROLLER" → DO NOT output {"name":"PICK UP ROLLER"}
+- ❌ Row 1 says "TONER" and Row 2 says "K" → DO NOT output {"name":"TONER K"} (UNLESS "TONER K" is on the SAME line)
+
+CORRECT examples:
+- ✓ Row 1 says "DRUM" and Row 2 says "C/BLADE" → output [{"name":"DRUM"}, {"name":"CLEANING BLADE"}] (2 items!)
+- ✓ Row 1 says "TONER C" (all on one line) → output [{"name":"TONER C"}] (1 item)
+- ✓ "C/BLADE" or "C BLADE" should be expanded to "CLEANING BLADE" but kept as ITS OWN item
+
+HOW TO COUNT ROWS:
+1. Look at the DESCRIPTION column
+2. Count distinct LINES of handwriting (each starts at a new row in the table grid)
+3. Each line = one separate item entry
+4. The number of items in JSON = the number of distinct text lines you see
+5. Even if two adjacent items are related (e.g. drum + drum cleaning blade), they go to SEPARATE entries
+
 OTHER RULES:
 - Read all rows in DESCRIPTION column (BOTH the consumable section AND the TONER section)
 - For QTY, read the number in the QTY column on each row
 - Common parts: DRUM, TONER C/M/Y/K, CHARGER ROLLER, PICK UP ROLLER, ADF BELT UNIT, FUSER, DEVELOPER, CLEANING BLADE, SLEEVE FILM, ELEMENT BAR, PCCB, CB
 - Standardize part names to UPPERCASE
-
-⚠️ CRITICAL - DO NOT MERGE ROWS:
-- EACH ROW in the form is a SEPARATE item, even if they look related
-- DO NOT combine adjacent rows into one item, EVEN if they could form a compound name
-- Example: if row 1 says "DRUM" and row 2 says "C/BLADE" (or "CLEANING BLADE"), these are TWO separate items, NOT "DRUM CLEANING BLADE"
-- Each line written by the technician = one item entry
-- Count by LINE BREAKS in the form, not by what makes sense as a phrase
-- "C/BLADE" or "C BLADE" should be read as "CLEANING BLADE" (a single part, not combined with previous row)
-
 - If handwriting is unclear, give your best interpretation based on context
+- If a row has crossed-out text AND new text written above/beside, use the NEW text
 - Skip ONLY truly empty rows (no text at all)
-- If a row has crossed-out text AND new text written above/beside, use the NEW text and ignore the crossed-out
 - Return ONLY the JSON object, nothing else, no markdown fences`;
   
   const body = {
@@ -2081,21 +2103,62 @@ async function parseFormText(text) {
       // 用 Map 跟踪同名物料,数量累加(不再丢弃重复)
       // key: 物料名+客户+型号 的组合,这样不同客户的同名物料不会合并
       const itemMap = new Map();
+      
+      // 拆分常见的"被合并"物料名 - 因为 GPT-4o 经常把相邻两行合并
+      // 这里我们做后处理:发现合并模式就拆开
+      const SPLIT_PATTERNS = [
+        // "DRUM CLEANING BLADE" -> "DRUM" + "CLEANING BLADE"
+        { regex: /^(DRUM)\s+(CLEANING\s+BLADE|C\/?BLADE|CB)$/i, parts: ['DRUM', 'CLEANING BLADE'] },
+        // "DRUM BLADE" -> "DRUM" + "CLEANING BLADE"
+        { regex: /^(DRUM)\s+(BLADE)$/i, parts: ['DRUM', 'CLEANING BLADE'] },
+        // "DRUM TONER" -> "DRUM" + "TONER"  
+        { regex: /^(DRUM)\s+(TONER\s*[CMYK]?)$/i, parts: ['DRUM', '$2'] },
+        // "DRUM CHARGER ROLLER" -> "DRUM" + "CHARGER ROLLER"
+        { regex: /^(DRUM)\s+(CHARGER\s+ROLLER)$/i, parts: ['DRUM', 'CHARGER ROLLER'] },
+        // "PICK UP ROLLER ADF BELT" -> "PICK UP ROLLER" + "ADF BELT"
+        { regex: /^(PICK\s*UP\s*ROLLER)\s+(ADF\s+BELT(\s+UNIT)?)$/i, parts: ['PICK UP ROLLER', 'ADF BELT UNIT'] },
+        // "TONER C TONER M" 这种连续多个 TONER -> 分开
+        { regex: /^(TONER\s+[CMYK])\s+(TONER\s+[CMYK])$/i, parts: ['$1', '$2'] },
+      ];
+      
+      function splitMergedName(name) {
+        const upper = name.trim().toUpperCase();
+        for (const pat of SPLIT_PATTERNS) {
+          const m = upper.match(pat.regex);
+          if (m) {
+            // 应用 capture groups
+            return pat.parts.map(p => {
+              if (p.startsWith('$')) {
+                const idx = parseInt(p.slice(1));
+                return m[idx];
+              }
+              return p;
+            });
+          }
+        }
+        return null;  // 不是合并模式
+      }
+      
       for (const it of parsed.items) {
         if (!it || !it.name) continue;
-        const name = String(it.name).trim();
+        const rawName = String(it.name).trim();
         const qty = parseInt(it.qty) || 1;
-        const norm = normalizePart(name);
-        if (!norm) continue;
         const itemCustomer = it.customer ? String(it.customer).trim() : '';
         const itemModel = it.model ? String(it.model).trim().toUpperCase() : '';
-        // 复合 key: 名+客户+型号
-        const dedupKey = `${norm}::${itemCustomer.toLowerCase()}::${itemModel.toLowerCase()}`;
-        if (itemMap.has(dedupKey)) {
-          // 同名+同客户+同型号 -> 累加数量
-          itemMap.get(dedupKey).qty += qty;
-        } else {
-          itemMap.set(dedupKey, { name, qty, customer: itemCustomer, model: itemModel });
+        
+        // 检查是否是合并的物料名
+        const splitNames = splitMergedName(rawName);
+        const namesToAdd = splitNames || [rawName];
+        
+        for (const name of namesToAdd) {
+          const norm = normalizePart(name);
+          if (!norm) continue;
+          const dedupKey = `${norm}::${itemCustomer.toLowerCase()}::${itemModel.toLowerCase()}`;
+          if (itemMap.has(dedupKey)) {
+            itemMap.get(dedupKey).qty += qty;
+          } else {
+            itemMap.set(dedupKey, { name, qty, customer: itemCustomer, model: itemModel });
+          }
         }
       }
       result.items = [...itemMap.values()];
