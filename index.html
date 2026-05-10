@@ -412,6 +412,62 @@
     display: flex; align-items: center; justify-content: center;
   }
   .item-row .remove-btn:hover { background: var(--warn); color: var(--bg); }
+  
+  /* 物料行包装 */
+  .item-row-wrap {
+    margin-bottom: 12px;
+  }
+  .item-row-wrap.has-override .item-row {
+    margin-bottom: 4px;
+  }
+  
+  /* 物料行的折叠"客户/型号"按钮 */
+  .item-override-row { margin-top: 0; }
+  .override-toggle {
+    background: none;
+    border: 1px dashed var(--line-soft);
+    color: var(--text-3);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+  }
+  .override-toggle:hover {
+    background: var(--bg-3);
+    color: var(--text-2);
+  }
+  .override-toggle.has-data {
+    color: var(--accent);
+    border-color: rgba(106, 199, 187, 0.5);
+    border-style: solid;
+    background: rgba(106, 199, 187, 0.06);
+  }
+  .override-toggle .toggle-icon {
+    font-size: 9px;
+    flex-shrink: 0;
+  }
+  .item-override-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 8px;
+    background: rgba(106, 199, 187, 0.04);
+    border-radius: 6px;
+    border: 1px solid rgba(106, 199, 187, 0.15);
+  }
+  .item-override-fields input {
+    padding: 8px 10px;
+    font-size: 13px;
+    background: var(--bg);
+  }
 
   .add-item-btn {
     width: 100%;
@@ -921,7 +977,7 @@
       </div>
       
       <div class="form-group">
-        <label class="field-label" data-i18n="label_customer">客户名 Customer</label>
+        <label class="field-label"><span data-i18n="label_customer">客户名 Customer</span> <span style="color: var(--text-3); font-size: 10px; font-weight: 400; letter-spacing: 0; text-transform: none;" data-i18n="label_default_hint">(默认 · 物料行可单独覆盖)</span></label>
         <div class="quick-chips" id="quickCustomers"></div>
         <div class="input-wrap">
           <input type="text" id="inCustomer" placeholder="点上方常用客户,或手动输入" autocomplete="off">
@@ -930,7 +986,7 @@
       </div>
       
       <div class="form-group">
-        <label class="field-label" data-i18n="label_model">机器型号 Model</label>
+        <label class="field-label"><span data-i18n="label_model">机器型号 Model</span> <span style="color: var(--text-3); font-size: 10px; font-weight: 400; letter-spacing: 0; text-transform: none;" data-i18n="label_default_hint">(默认 · 物料行可单独覆盖)</span></label>
         <div class="quick-chips" id="quickModels"></div>
         <div class="input-wrap">
           <input type="text" id="inModel" placeholder="点上方常用型号,或手动输入" autocomplete="off">
@@ -1781,9 +1837,9 @@ Extract the following and return ONLY valid JSON (no markdown, no explanation):
   "refNo": "reference number or empty",
   "tech": "technician/requestor name (look for REQUESTOR NAME field) or empty",
   "customer": "customer name (most common one in CUSTOMER NAME column) or empty",
-  "model": "machine model like MPC 3004, MP 3555, IM C2000, or empty",
+  "model": "machine model like MPC 3004, MP 3555, IM C2000, or empty (most common one)",
   "items": [
-    {"name": "PART NAME IN UPPERCASE", "qty": number}
+    {"name": "PART NAME IN UPPERCASE", "qty": number, "customer": "customer for this specific row or empty if same as default", "model": "model for this specific row or empty if same as default"}
   ]
 }
 
@@ -1801,6 +1857,19 @@ CRITICAL DATE PARSING RULES:
 - "2/5/2026" means 2 May 2026 = output "2026-05-02"
 - NEVER swap day and month
 - If only DD/MM/YY is shown, assume 20YY
+
+PER-ITEM CUSTOMER & MODEL (important - forms often have multiple customers):
+- Each row in the items table can have its OWN customer and model (in CUSTOMER NAME and MODEL columns)
+- Read EACH row's customer and model separately
+- For top-level "customer" and "model" fields, use the MOST COMMON one across all rows
+- For each item, fill "customer" and "model" with that specific row's value
+- If a row's customer/model is the SAME as the top-level default, you can leave the item's "customer"/"model" empty (saves space)
+- If a row's customer/model is DIFFERENT from the default, MUST fill it in for that item
+- Example: form has 3 rows. Row 1,2 = "MK Network" / "ADV5235". Row 3 = "TS Teoh" / "ADV5560".
+  → top-level customer="MK Network", model="ADV5235"
+  → items[0].customer="" items[0].model="" (same as default, leave empty)
+  → items[1].customer="" items[1].model="" (same as default, leave empty)
+  → items[2].customer="TS Teoh" items[2].model="ADV5560" (different, MUST fill)
 
 OTHER RULES:
 - Read all rows in DESCRIPTION column (BOTH the consumable section AND the TONER section)
@@ -1874,7 +1943,9 @@ async function parseFormText(text) {
         const norm = normalizePart(name);
         if (!norm || seen.has(norm)) continue;
         seen.add(norm);
-        result.items.push({ name, qty });
+        const itemCustomer = it.customer ? String(it.customer).trim() : '';
+        const itemModel = it.model ? String(it.model).trim().toUpperCase() : '';
+        result.items.push({ name, qty, customer: itemCustomer, model: itemModel });
       }
     }
   } catch (e) {
@@ -1905,25 +1976,76 @@ document.getElementById('fab').addEventListener('click', () => switchTab('add'))
 // ============== ADD: Item rows ==============
 const itemsContainer = document.getElementById('itemsContainer');
 
-function addItemRow(name = '', qty = 1, price = null) {
+function addItemRow(name = '', qty = 1, price = null, customer = '', model = '') {
   const row = document.createElement('div');
-  row.className = 'item-row';
+  row.className = 'item-row-wrap';
+  const hasOverride = (customer && customer.trim()) || (model && model.trim());
   row.innerHTML = `
-    <div class="input-wrap">
-      <input type="text" class="item-name" placeholder="物料名（如:Drum）" value="${escapeHtml(name)}" autocomplete="off">
-      <div class="suggestions"></div>
+    <div class="item-row">
+      <div class="input-wrap">
+        <input type="text" class="item-name" placeholder="物料名（如:Drum）" value="${escapeHtml(name)}" autocomplete="off">
+        <div class="suggestions"></div>
+      </div>
+      <input type="number" class="item-qty" min="1" placeholder="数量" value="${qty}">
+      <input type="number" class="item-price" min="0" step="0.01" placeholder="单价" value="${price !== null ? price : ''}">
+      <button type="button" class="remove-btn" title="删除">×</button>
     </div>
-    <input type="number" class="item-qty" min="1" placeholder="数量" value="${qty}">
-    <input type="number" class="item-price" min="0" step="0.01" placeholder="单价" value="${price !== null ? price : ''}">
-    <button type="button" class="remove-btn" title="删除">×</button>
+    <div class="item-override-row">
+      <button type="button" class="override-toggle ${hasOverride ? 'has-data' : ''}" title="为此物料单独指定客户/型号">
+        <span class="toggle-icon">${hasOverride ? '▼' : '▸'}</span>
+        <span class="toggle-label">${hasOverride ? '该物料客户/型号 ↓' : '+ 不同客户/型号 (可选)'}</span>
+      </button>
+      <div class="item-override-fields ${hasOverride ? '' : 'hidden'}">
+        <div class="input-wrap" style="flex: 1;">
+          <input type="text" class="item-customer" placeholder="此行客户(留空=用上面的)" value="${escapeHtml(customer)}" autocomplete="off">
+          <div class="suggestions"></div>
+        </div>
+        <div class="input-wrap" style="flex: 1;">
+          <input type="text" class="item-model" placeholder="此行型号(留空=用上面的)" value="${escapeHtml(model)}" autocomplete="off">
+          <div class="suggestions"></div>
+        </div>
+      </div>
+    </div>
   `;
   itemsContainer.appendChild(row);
   
   const nameInput = row.querySelector('.item-name');
   const qtyInput = row.querySelector('.item-qty');
   const priceInput = row.querySelector('.item-price');
-  const sugBox = row.querySelector('.suggestions');
+  const customerInput = row.querySelector('.item-customer');
+  const modelInput = row.querySelector('.item-model');
+  const sugBox = row.querySelector('.item-row .suggestions');
   setupAutocomplete(nameInput, sugBox, 'part');
+  // 让客户/型号字段也有自动建议
+  setupAutocomplete(customerInput, customerInput.parentElement.querySelector('.suggestions'), 'customer');
+  setupAutocomplete(modelInput, modelInput.parentElement.querySelector('.suggestions'), 'model');
+  
+  // 折叠展开按钮
+  const overrideBtn = row.querySelector('.override-toggle');
+  const overrideFields = row.querySelector('.item-override-fields');
+  overrideBtn.addEventListener('click', () => {
+    const isHidden = overrideFields.classList.contains('hidden');
+    overrideFields.classList.toggle('hidden');
+    const hasData = (customerInput.value.trim() || modelInput.value.trim());
+    overrideBtn.querySelector('.toggle-icon').textContent = isHidden ? '▼' : '▸';
+    overrideBtn.querySelector('.toggle-label').textContent = isHidden 
+      ? '该物料客户/型号 ↓' 
+      : (hasData ? '该物料客户/型号 ↓' : '+ 不同客户/型号 (可选)');
+    overrideBtn.classList.toggle('has-data', !!(customerInput.value.trim() || modelInput.value.trim()));
+  });
+  
+  // 客户/型号变化时更新按钮状态
+  [customerInput, modelInput].forEach(inp => {
+    inp.addEventListener('blur', () => {
+      const hasData = customerInput.value.trim() || modelInput.value.trim();
+      overrideBtn.classList.toggle('has-data', !!hasData);
+      if (!overrideFields.classList.contains('hidden')) {
+        overrideBtn.querySelector('.toggle-label').textContent = hasData 
+          ? '该物料客户/型号 ↓' 
+          : '+ 不同客户/型号 (可选)';
+      }
+    });
+  });
   
   // 物料名变化时自动从价格库填入价格
   nameInput.addEventListener('blur', async () => {
@@ -1995,11 +2117,17 @@ function clearItemRows() {
 }
 
 function getItems() {
-  return [...itemsContainer.querySelectorAll('.item-row')].map(r => ({
-    name: r.querySelector('.item-name').value.trim(),
-    qty: parseInt(r.querySelector('.item-qty').value) || 0,
-    price: parseFloat(r.querySelector('.item-price').value) || 0
-  })).filter(it => it.name && it.qty > 0);
+  return [...itemsContainer.querySelectorAll('.item-row-wrap')].map(r => {
+    const customerInp = r.querySelector('.item-customer');
+    const modelInp = r.querySelector('.item-model');
+    return {
+      name: r.querySelector('.item-name').value.trim(),
+      qty: parseInt(r.querySelector('.item-qty').value) || 0,
+      price: parseFloat(r.querySelector('.item-price').value) || 0,
+      customer: customerInp ? customerInp.value.trim() : '',
+      model: modelInp ? modelInp.value.trim() : ''
+    };
+  }).filter(it => it.name && it.qty > 0);
 }
 
 document.getElementById('addItemBtn').addEventListener('click', () => addItemRow());
@@ -2240,11 +2368,14 @@ async function handleImageFile(file) {
     
     if (parsed.items.length) {
       clearItemRows();
-      parsed.items.forEach(it => addItemRow(it.name, it.qty));
+      parsed.items.forEach(it => addItemRow(it.name, it.qty, null, it.customer || '', it.model || ''));
     }
     
+    // 检查有没有"行级别"客户/型号 -> 显示提示
+    const hasRowOverride = parsed.items.some(it => it.customer || it.model);
+    
     ocrStatus.className = 'ocr-status success';
-    ocrStatus.innerHTML = `✓ 识别完成,检测到 ${parsed.items.length} 项物料 · 请检查并修改`;
+    ocrStatus.innerHTML = `✓ 识别完成,检测到 ${parsed.items.length} 项物料${hasRowOverride ? ' · ⚠ 检测到多个客户/型号,请展开物料行检查' : ''} · 请检查并修改`;
   } catch (err) {
     ocrStatus.className = 'ocr-status error';
     ocrStatus.innerHTML = '✗ ' + err.message;
@@ -2359,11 +2490,18 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   const tech = document.getElementById('inTech').value.trim();
   const customer = document.getElementById('inCustomer').value.trim();
   const model = document.getElementById('inModel').value.trim();
-  const items = getItems();
+  let items = getItems();
   
   if (!date) { showToast(t('toast_required_date')); return; }
   if (!company) { showToast(t('toast_required_company')); return; }
   if (items.length === 0) { showToast(t('toast_required_items')); return; }
+  
+  // 物料没单独填客户/型号 -> 用表头默认
+  items = items.map(it => ({
+    ...it,
+    customer: it.customer || customer,
+    model: it.model || model
+  }));
   
   const isEditing = document.getElementById('saveBtn').dataset.editId;
   const formData = {
@@ -2553,6 +2691,20 @@ async function openDetail(id) {
   
   const totalQty = f.items.reduce((s, it) => s + (it.qty || 0), 0);
   
+  // 把 items 按 (customer, model) 分组,这样多客户/型号的表能清楚显示
+  const headerCustomer = (f.customer || '').trim();
+  const headerModel = (f.model || '').trim();
+  const grouped = {};
+  f.items.forEach(it => {
+    const c = (it.customer && it.customer.trim()) || headerCustomer || '(无客户)';
+    const m = (it.model && it.model.trim()) || headerModel || '';
+    const key = `${c}__${m}`;
+    if (!grouped[key]) grouped[key] = { customer: c, model: m, items: [] };
+    grouped[key].items.push(it);
+  });
+  const groups = Object.values(grouped);
+  const isMultiGroup = groups.length > 1;
+  
   document.getElementById('detailContent').innerHTML = `
     ${f.photo ? `
       <div style="margin-bottom: 14px; text-align: center;">
@@ -2564,25 +2716,39 @@ async function openDetail(id) {
       ${f.company ? `<span class="company-badge company-${f.company.toLowerCase().replace(/[^a-z]/g, '')}">${escapeHtml(f.company)}</span>` : ''}
       ${f.refNo ? 'Ref #' + escapeHtml(f.refNo) + ' · ' : ''}${f.date}${f.tech ? ' · 👤 ' + escapeHtml(f.tech) : ''}
     </div>
-    <div style="font-size: 18px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(f.customer || '(无客户)')}</div>
-    ${f.model ? `<div style="display: inline-block; background: var(--bg-3); color: var(--accent); padding: 4px 10px; border-radius: 5px; font-size: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 600; margin-bottom: 14px;">${escapeHtml(f.model)}</div>` : ''}
+    ${!isMultiGroup ? `
+      <div style="font-size: 18px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(f.customer || '(无客户)')}</div>
+      ${f.model ? `<div style="display: inline-block; background: var(--bg-3); color: var(--accent); padding: 4px 10px; border-radius: 5px; font-size: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 600; margin-bottom: 14px;">${escapeHtml(f.model)}</div>` : ''}
+    ` : `
+      <div style="font-size: 12px; color: var(--accent); margin: 8px 0 12px; padding: 6px 10px; background: rgba(106, 199, 187, 0.1); border-radius: 6px; border-left: 3px solid var(--accent);">
+        ⚡ ${currentLang === 'en' ? 'Multiple customers/models' : '此表有多个客户/型号'} (${groups.length})
+      </div>
+    `}
     
     <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); margin: 14px 0 8px;">${t('detail_items_label')} · ${f.items.length} · ${totalQty} ${t('detail_units')}${(() => {
       const total = f.items.reduce((s, it) => s + (it.qty || 0) * (it.price || 0), 0);
       return total > 0 ? ` · <span style="color: var(--accent-2); font-weight: 600;">RM ${total.toFixed(2)}</span>` : '';
     })()}</div>
     
-    <div style="background: var(--bg); border-radius: 8px; padding: 4px 14px;">
-      ${f.items.map(it => `
-        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line-soft);">
-          <span>${escapeHtml(it.name)}</span>
-          <div style="text-align: right;">
-            <span style="color: var(--accent); font-family: 'JetBrains Mono', monospace; font-weight: 600;">×${it.qty}</span>
-            ${it.price > 0 ? `<div style="font-size: 11px; color: var(--accent-2); font-family: 'JetBrains Mono', monospace;">RM ${(it.qty * it.price).toFixed(2)}</div>` : ''}
+    ${groups.map(g => `
+      <div style="background: var(--bg); border-radius: 8px; padding: 12px 14px; margin-bottom: ${isMultiGroup ? '10px' : '0'};">
+        ${isMultiGroup ? `
+          <div style="display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--line-soft); margin-bottom: 6px;">
+            <div style="font-size: 14px; font-weight: 600; color: var(--text);">${escapeHtml(g.customer)}</div>
+            ${g.model ? `<div style="background: var(--bg-3); color: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${escapeHtml(g.model)}</div>` : ''}
           </div>
-        </div>
-      `).join('')}
-    </div>
+        ` : ''}
+        ${g.items.map(it => `
+          <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line-soft);">
+            <span>${escapeHtml(it.name)}</span>
+            <div style="text-align: right;">
+              <span style="color: var(--accent); font-family: 'JetBrains Mono', monospace; font-weight: 600;">×${it.qty}</span>
+              ${it.price > 0 ? `<div style="font-size: 11px; color: var(--accent-2); font-family: 'JetBrains Mono', monospace;">RM ${(it.qty * it.price).toFixed(2)}</div>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('')}
   `;
   
   document.getElementById('detailModal').classList.add('show');
@@ -2605,7 +2771,16 @@ document.getElementById('editForm').addEventListener('click', async () => {
   document.getElementById('inCompany').value = f.company || '';
   syncCompanyButtons();
   clearItemRows();
-  f.items.forEach(it => addItemRow(it.name, it.qty, it.price !== undefined ? it.price : null));
+  // 物料行的 customer/model 如果跟表头一样,就不在覆盖字段里显示(让默认值生效)
+  const headerCustomer = (f.customer || '').trim().toLowerCase();
+  const headerModel = (f.model || '').trim().toLowerCase();
+  f.items.forEach(it => {
+    const itC = (it.customer || '').trim();
+    const itM = (it.model || '').trim();
+    const showC = itC && itC.toLowerCase() !== headerCustomer ? itC : '';
+    const showM = itM && itM.toLowerCase() !== headerModel ? itM : '';
+    addItemRow(it.name, it.qty, it.price !== undefined ? it.price : null, showC, showM);
+  });
   if (f.items.length === 0) addItemRow();
   updateItemsTotal();
   
@@ -2745,24 +2920,32 @@ async function renderStats() {
       stats[norm].amount += (it.qty || 0) * (it.price || 0);
     }));
   } else if (statMode === 'customers') {
+    // 按客户统计 - 用每个物料行的 customer(没填则 fallback 到表头)
     inRange.forEach(f => {
-      const key = (f.customer || '(无客户)').trim();
-      if (!stats[key]) stats[key] = { name: key, qty: 0, forms: 0, amount: 0 };
-      stats[key].forms += 1;
+      const headerC = (f.customer || '').trim();
+      const formCustomers = new Set();  // 这张表关联了哪些客户
       f.items.forEach(it => {
-        stats[key].qty += it.qty || 0;
-        stats[key].amount += (it.qty || 0) * (it.price || 0);
+        const c = (it.customer && it.customer.trim()) || headerC || '(无客户)';
+        if (!stats[c]) stats[c] = { name: c, qty: 0, forms: 0, amount: 0 };
+        stats[c].qty += it.qty || 0;
+        stats[c].amount += (it.qty || 0) * (it.price || 0);
+        formCustomers.add(c);
       });
+      // 表数+1 给每个不同客户
+      formCustomers.forEach(c => { stats[c].forms += 1; });
     });
   } else if (statMode === 'models') {
     inRange.forEach(f => {
-      const key = (f.model || '(无型号)').trim();
-      if (!stats[key]) stats[key] = { name: key, qty: 0, forms: 0, amount: 0 };
-      stats[key].forms += 1;
+      const headerM = (f.model || '').trim();
+      const formModels = new Set();
       f.items.forEach(it => {
-        stats[key].qty += it.qty || 0;
-        stats[key].amount += (it.qty || 0) * (it.price || 0);
+        const m = (it.model && it.model.trim()) || headerM || '(无型号)';
+        if (!stats[m]) stats[m] = { name: m, qty: 0, forms: 0, amount: 0 };
+        stats[m].qty += it.qty || 0;
+        stats[m].amount += (it.qty || 0) * (it.price || 0);
+        formModels.add(m);
       });
+      formModels.forEach(m => { stats[m].forms += 1; });
     });
   } else if (statMode === 'techs') {
     inRange.forEach(f => {
@@ -3145,14 +3328,16 @@ document.getElementById('exportCsv').addEventListener('click', async () => {
   const all = await Data.getAllForms();
   if (all.length === 0) { showToast('暂无数据'); return; }
   
-  // CSV: each item is a row
+  // CSV: each item is a row - 使用每行的 customer/model(没填则用表头)
   const headers = ['Date', 'Company', 'Ref No', 'Technician', 'Customer', 'Model', 'Part', 'Qty', 'Price', 'Subtotal'];
   const rows = [];
   all.forEach(f => {
     f.items.forEach(it => {
       const price = it.price || 0;
       const subtotal = (it.qty || 0) * price;
-      rows.push([f.date, f.company || '', f.refNo || '', f.tech || '', f.customer || '', f.model || '', it.name, it.qty, price.toFixed(2), subtotal.toFixed(2)]);
+      const itemCustomer = (it.customer && it.customer.trim()) || f.customer || '';
+      const itemModel = (it.model && it.model.trim()) || f.model || '';
+      rows.push([f.date, f.company || '', f.refNo || '', f.tech || '', itemCustomer, itemModel, it.name, it.qty, price.toFixed(2), subtotal.toFixed(2)]);
     });
   });
   
